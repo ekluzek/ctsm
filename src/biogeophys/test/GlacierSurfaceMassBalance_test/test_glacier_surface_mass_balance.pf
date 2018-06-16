@@ -132,9 +132,7 @@ contains
     use clm_varcon                    , only : clm_varcon_clean
     class(TestGSMB), intent(inout) :: this
 
-    if (unittest_subgrid_needs_teardown) then
-       call unittest_subgrid_teardown()
-    end if
+    call unittest_subgrid_teardown()
     call unittest_timemgr_teardown()
     call this%glcsmb%Clean()
     call this%waterstate_inst%Clean()
