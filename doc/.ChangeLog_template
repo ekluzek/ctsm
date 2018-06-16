@@ -18,6 +18,8 @@ CIME Issues fixed (include issue #): [If none, remove this line]
 
 Known bugs introduced in this tag (include github issue ID): [If none, remove this line]
 
+Known bugs found since the previous tag (include github issue ID): [If none, remove this line]
+
 
 Notes of particular relevance for users
 ---------------------------------------
@@ -34,6 +36,7 @@ Substantial timing or memory changes:
 
 Notes of particular relevance for developers: (including Code reviews and testing)
 ---------------------------------------------
+NOTE: Be sure to review the steps in .CLMTrunkChecklist as well as the coding style in the Developers Guide
 
 Caveats for developers (e.g., code that is duplicated that requires double maintenance):
 
@@ -41,7 +44,6 @@ Changes to tests or testing:
 
 Code reviewed by:
 
-Did you follow the steps in .CLMTrunkChecklist:
 
 CLM testing:
 
@@ -114,10 +116,7 @@ Detailed list of changes
 
 List any externals directories updated (cime, rtm, mosart, cism, fates, etc.):
 
-List all files eliminated:
-
-List all files added and what they do:
-
-List all existing files that have been modified, and describe the changes:
+Pull Requests that document the changes (include PR ids):
+(https://github.com/ESCOMP/ctsm/pull)
 
 ===============================================================
