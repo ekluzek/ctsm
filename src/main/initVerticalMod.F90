@@ -18,7 +18,6 @@ module initVerticalMod
   use clm_varctl        , only : fsurdat, iulog
   use clm_varctl        , only : use_vancouver, use_mexicocity, use_vertsoilc, use_extralakelayers
   use clm_varctl        , only : use_bedrock, soil_layerstruct
-  use clm_varctl        , only : use_fates
   use clm_varcon        , only : zlak, dzlak, zsoi, dzsoi, zisoi, dzsoi_decomp, spval, ispval, grlnd 
   use column_varcon     , only : icol_roof, icol_sunwall, icol_shadewall, is_hydrologically_active
   use landunit_varcon   , only : istdlak, istice_mec
@@ -29,7 +28,6 @@ module initVerticalMod
   use glcBehaviorMod    , only : glc_behavior_type
   use SnowHydrologyMod  , only : InitSnowLayers             
   use abortUtils        , only : endrun    
-  use ncdio_pio
   !
   ! !PUBLIC TYPES:
   implicit none
@@ -38,6 +36,8 @@ module initVerticalMod
   !
   ! !PUBLIC MEMBER FUNCTIONS:
   public :: initVertical
+  ! !PUBLIC MEMBER FUNCTIONS (NEEDED FOR UNIT TESTING):
+  public :: setSoilLayers
   ! !PRIVATE MEMBER FUNCTIONS:
   private :: ReadNL
   private :: hasBedrock  ! true if the given column type includes bedrock layers
@@ -52,7 +52,7 @@ module initVerticalMod
 contains
 
   !------------------------------------------------------------------------
-  subroutine ReadNL( )
+  subroutine ReadNL( NLFilename )
     !
     ! !DESCRIPTION:
     ! Read namelist for SoilStateType
@@ -64,9 +64,10 @@ contains
     use clm_nlUtilsMod , only : find_nlgroup_name
     use clm_varctl     , only : iulog
     use spmdMod        , only : mpicom, masterproc
-    use controlMod     , only : NLFilename
     !
     ! !ARGUMENTS:
+    implicit none
+    character(len=*), intent(in) :: NLFilename ! Namelist filename
     !
     ! !LOCAL VARIABLES:
     integer :: ierr                 ! error code
@@ -106,81 +107,20 @@ contains
   end subroutine ReadNL
 
   !------------------------------------------------------------------------
-  subroutine initVertical(bounds, glc_behavior, snow_depth, thick_wall, thick_roof)
-    use clm_varcon, only : zmin_bedrock, n_melt_glcmec
+  subroutine setSoilLayers()
+    ! --------------------------------------------------------------------
+    ! Define layer structure for soil
+    ! --------------------------------------------------------------------
     !
     ! !ARGUMENTS:
-    type(bounds_type)   , intent(in)    :: bounds
-    type(glc_behavior_type), intent(in) :: glc_behavior
-    real(r8)            , intent(in)    :: snow_depth(bounds%begc:)
-    real(r8)            , intent(in)    :: thick_wall(bounds%begl:)
-    real(r8)            , intent(in)    :: thick_roof(bounds%begl:)
+    implicit none
     !
     ! LOCAL VARAIBLES:
-    integer               :: c,l,g,i,j,lev     ! indices 
-    type(file_desc_t)     :: ncid              ! netcdf id
-    logical               :: readvar 
-    integer               :: dimid             ! dimension id
-    character(len=256)    :: locfn             ! local filename
-    real(r8) ,pointer     :: std (:)           ! read in - topo_std 
-    real(r8) ,pointer     :: tslope (:)        ! read in - topo_slope 
-    real(r8)              :: slope0            ! temporary
-    real(r8)              :: slopebeta         ! temporary
-    real(r8)              :: slopemax          ! temporary
-    integer               :: ier               ! error status
+    integer               :: j                 ! indices 
     real(r8)              :: scalez = 0.025_r8 ! Soil layer thickness discretization (m)
     real(r8)              :: thick_equal = 0.2
-    real(r8) ,pointer     :: zbedrock_in(:)   ! read in - z_bedrock
-    real(r8) ,pointer     :: lakedepth_in(:)   ! read in - lakedepth 
-    real(r8), allocatable :: zurb_wall(:,:)    ! wall (layer node depth)
-    real(r8), allocatable :: zurb_roof(:,:)    ! roof (layer node depth)
-    real(r8), allocatable :: dzurb_wall(:,:)   ! wall (layer thickness)
-    real(r8), allocatable :: dzurb_roof(:,:)   ! roof (layer thickness)
-    real(r8), allocatable :: ziurb_wall(:,:)   ! wall (layer interface)
-    real(r8), allocatable :: ziurb_roof(:,:)   ! roof (layer interface)
-    real(r8)              :: depthratio        ! ratio of lake depth to standard deep lake depth 
-    integer               :: begc, endc
-    integer               :: begl, endl
-    integer               :: jmin_bedrock
-
-    ! Possible values for levgrnd_class. The important thing is that, for a given column,
-    ! layers that are fundamentally different (e.g., soil vs bedrock) have different
-    ! values. This information is used in the vertical interpolation in init_interp.
-    !
-    ! IMPORTANT: These values should not be changed lightly. e.g., try to avoid changing
-    ! the values assigned to LEVGRND_CLASS_STANDARD, LEVGRND_CLASS_DEEP_BEDROCK, etc.  The
-    ! problem with changing these is that init_interp expects that layers with a value of
-    ! (e.g.) 1 on the source file correspond to layers with a value of 1 on the
-    ! destination file. So if you change the values of these constants, you either need to
-    ! adequately inform users of this change, or build in some translation mechanism in
-    ! init_interp (such as via adding more metadata to the restart file on the meaning of
-    ! these different values).
-    !
-    ! The distinction between "shallow" and "deep" bedrock is not made explicitly
-    ! elsewhere. But, since these classes have somewhat different behavior, they are
-    ! distinguished explicitly here.
-    integer, parameter :: LEVGRND_CLASS_STANDARD        = 1
-    integer, parameter :: LEVGRND_CLASS_DEEP_BEDROCK    = 2
-    integer, parameter :: LEVGRND_CLASS_SHALLOW_BEDROCK = 3
     !------------------------------------------------------------------------
 
-    begc = bounds%begc; endc= bounds%endc
-    begl = bounds%begl; endl= bounds%endl
-
-    SHR_ASSERT_ALL((ubound(snow_depth)  == (/endc/)), errMsg(sourcefile, __LINE__))
-    SHR_ASSERT_ALL((ubound(thick_wall)  == (/endl/)), errMsg(sourcefile, __LINE__))
-    SHR_ASSERT_ALL((ubound(thick_roof)  == (/endl/)), errMsg(sourcefile, __LINE__))
-
-    ! Open surface dataset to read in data below 
-
-    call getfil (fsurdat, locfn, 0)
-    call ncd_pio_openfile (ncid, locfn, 0)
-
-    ! --------------------------------------------------------------------
-    ! Define layer structure for soil, lakes, urban walls and roof 
-    ! Vertical profile of snow is not initialized here - but below
-    ! --------------------------------------------------------------------
-    
     ! Soil layers and interfaces (assumed same for all non-lake patches)
     ! "0" refers to soil surface and "nlevsoi" refers to the bottom of model soil
 
@@ -294,6 +234,88 @@ contains
        write(iulog, *) 'dzsoi: ', dzsoi(:)
        write(iulog, *) 'dzsoi_decomp: ',dzsoi_decomp
     end if
+  end subroutine setSoilLayers
+
+  !------------------------------------------------------------------------
+  subroutine initVertical(bounds, glc_behavior, snow_depth, thick_wall, thick_roof)
+    use clm_varcon, only : zmin_bedrock, n_melt_glcmec
+    use ncdio_pio , only : ncd_pio_openfile, ncd_pio_closefile, ncd_io, file_desc_t
+    !
+    ! !ARGUMENTS:
+    implicit none
+    type(bounds_type)   , intent(in)    :: bounds
+    type(glc_behavior_type), intent(in) :: glc_behavior
+    real(r8)            , intent(in)    :: snow_depth(bounds%begc:)
+    real(r8)            , intent(in)    :: thick_wall(bounds%begl:)
+    real(r8)            , intent(in)    :: thick_roof(bounds%begl:)
+    !
+    ! LOCAL VARAIBLES:
+    integer               :: c,l,g,i,j,lev     ! indices 
+    type(file_desc_t)     :: ncid              ! netcdf id
+    logical               :: readvar 
+    integer               :: dimid             ! dimension id
+    character(len=256)    :: locfn             ! local filename
+    real(r8) ,pointer     :: std (:)           ! read in - topo_std 
+    real(r8) ,pointer     :: tslope (:)        ! read in - topo_slope 
+    real(r8)              :: slope0            ! temporary
+    real(r8)              :: slopebeta         ! temporary
+    real(r8)              :: slopemax          ! temporary
+    integer               :: ier               ! error status
+    real(r8) ,pointer     :: zbedrock_in(:)   ! read in - z_bedrock
+    real(r8) ,pointer     :: lakedepth_in(:)   ! read in - lakedepth 
+    real(r8), allocatable :: zurb_wall(:,:)    ! wall (layer node depth)
+    real(r8), allocatable :: zurb_roof(:,:)    ! roof (layer node depth)
+    real(r8), allocatable :: dzurb_wall(:,:)   ! wall (layer thickness)
+    real(r8), allocatable :: dzurb_roof(:,:)   ! roof (layer thickness)
+    real(r8), allocatable :: ziurb_wall(:,:)   ! wall (layer interface)
+    real(r8), allocatable :: ziurb_roof(:,:)   ! roof (layer interface)
+    real(r8)              :: depthratio        ! ratio of lake depth to standard deep lake depth 
+    integer               :: begc, endc
+    integer               :: begl, endl
+    integer               :: jmin_bedrock
+
+    ! Possible values for levgrnd_class. The important thing is that, for a given column,
+    ! layers that are fundamentally different (e.g., soil vs bedrock) have different
+    ! values. This information is used in the vertical interpolation in init_interp.
+    !
+    ! IMPORTANT: These values should not be changed lightly. e.g., try to avoid changing
+    ! the values assigned to LEVGRND_CLASS_STANDARD, LEVGRND_CLASS_DEEP_BEDROCK, etc.  The
+    ! problem with changing these is that init_interp expects that layers with a value of
+    ! (e.g.) 1 on the source file correspond to layers with a value of 1 on the
+    ! destination file. So if you change the values of these constants, you either need to
+    ! adequately inform users of this change, or build in some translation mechanism in
+    ! init_interp (such as via adding more metadata to the restart file on the meaning of
+    ! these different values).
+    !
+    ! The distinction between "shallow" and "deep" bedrock is not made explicitly
+    ! elsewhere. But, since these classes have somewhat different behavior, they are
+    ! distinguished explicitly here.
+    integer, parameter :: LEVGRND_CLASS_STANDARD        = 1
+    integer, parameter :: LEVGRND_CLASS_DEEP_BEDROCK    = 2
+    integer, parameter :: LEVGRND_CLASS_SHALLOW_BEDROCK = 3
+    !------------------------------------------------------------------------
+
+    begc = bounds%begc; endc= bounds%endc
+    begl = bounds%begl; endl= bounds%endl
+
+    SHR_ASSERT_ALL((ubound(snow_depth)  == (/endc/)), errMsg(sourcefile, __LINE__))
+    SHR_ASSERT_ALL((ubound(thick_wall)  == (/endl/)), errMsg(sourcefile, __LINE__))
+    SHR_ASSERT_ALL((ubound(thick_roof)  == (/endl/)), errMsg(sourcefile, __LINE__))
+
+    ! Open surface dataset to read in data below 
+
+    call getfil (fsurdat, locfn, 0)
+    call ncd_pio_openfile (ncid, locfn, 0)
+
+    ! --------------------------------------------------------------------
+    ! Define layer structure for soil, lakes, urban walls and roof 
+    ! Vertical profile of snow is not initialized here - but below
+    ! --------------------------------------------------------------------
+    
+    ! Soil layers and interfaces (assumed same for all non-lake patches)
+    ! "0" refers to soil surface and "nlevsoi" refers to the bottom of model soil
+
+    call setSoilLayers()
 
     if (nlevurb > 0) then
        allocate(zurb_wall(bounds%begl:bounds%endl,nlevurb),    &

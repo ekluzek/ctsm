@@ -102,6 +102,7 @@ module WaterstateType
 
      procedure          :: Init         
      procedure          :: Restart      
+     procedure          :: Clean
      procedure, public  :: Reset 
      procedure, private :: InitAllocate 
      procedure, private :: InitHistory  
@@ -239,6 +240,88 @@ contains
     allocate(this%errh2o_col             (begc:endc))                     ; this%errh2o_col             (:)   = nan
     allocate(this%errh2osno_col          (begc:endc))                     ; this%errh2osno_col          (:)   = nan
   end subroutine InitAllocate
+
+  !------------------------------------------------------------------------
+  subroutine Clean(this)
+    !
+    ! !DESCRIPTION:
+    ! Clean module data structure
+    !
+    ! !USES:
+    !
+    ! !ARGUMENTS:
+    class(waterstate_type) :: this
+    !
+    ! !LOCAL VARIABLES:
+    !------------------------------------------------------------------------
+
+    deallocate(this%snow_depth_col       )
+    deallocate(this%snow_persistence_col )
+    deallocate(this%snowdp_col           )
+    deallocate(this%snowice_col            )
+    deallocate(this%snowliq_col            )
+    deallocate(this%int_snow_col           )
+    deallocate(this%snow_layer_unity_col   )
+    deallocate(this%bw_col                 )
+    deallocate(this%h2osno_col             )
+    deallocate(this%h2osno_old_col         )
+    deallocate(this%h2osoi_liqice_10cm_col )
+    deallocate(this%h2osoi_vol_col         )
+    deallocate(this%air_vol_col            )
+    deallocate(this%h2osoi_liqvol_col      )
+    deallocate(this%h2osoi_ice_col         )
+    deallocate(this%h2osoi_liq_col         )
+    deallocate(this%h2osoi_ice_tot_col     )
+    deallocate(this%h2osoi_liq_tot_col     )
+    deallocate(this%h2ocan_patch           )
+    deallocate(this%snocan_patch           )
+    deallocate(this%liqcan_patch           )
+    deallocate(this%snounload_patch        )
+    deallocate(this%h2osfc_col             )
+    deallocate(this%swe_old_col            )
+    deallocate(this%liq1_grc               )
+    deallocate(this%liq2_grc               )
+    deallocate(this%ice1_grc               )
+    deallocate(this%ice2_grc               )
+    deallocate(this%tws_grc                )
+
+    deallocate(this%total_plant_stored_h2o_col)
+
+    deallocate(this%snw_rds_col            )
+    deallocate(this%snw_rds_top_col        )
+    deallocate(this%h2osno_top_col         )
+    deallocate(this%sno_liq_top_col        )
+
+    deallocate(this%qg_snow_col            )
+    deallocate(this%qg_soil_col            )
+    deallocate(this%qg_h2osfc_col          )
+    deallocate(this%qg_col                 )
+    deallocate(this%dqgdT_col              )
+    deallocate(this%qaf_lun                )
+    deallocate(this%q_ref2m_patch          )
+    deallocate(this%rh_ref2m_patch         )
+    deallocate(this%rh_ref2m_u_patch       )
+    deallocate(this%rh_ref2m_r_patch       )
+    deallocate(this%rh_af_patch            )
+    deallocate(this%rh10_af_patch          )
+
+    deallocate(this%frac_sno_col           )
+    deallocate(this%frac_sno_eff_col       )
+    deallocate(this%frac_iceold_col        )
+    deallocate(this%frac_h2osfc_col        )
+    deallocate(this%frac_h2osfc_nosnow_col )
+    deallocate(this%wf_col                 )
+    deallocate(this%wf2_col                )
+    deallocate(this%fwet_patch             )
+    deallocate(this%fcansno_patch          )
+    deallocate(this%fdry_patch             )
+
+    deallocate(this%begwb_col              )
+    deallocate(this%endwb_col              )
+    deallocate(this%errh2o_patch           )
+    deallocate(this%errh2o_col             )
+    deallocate(this%errh2osno_col          )
+  end subroutine Clean
 
   !------------------------------------------------------------------------
   subroutine InitHistory(this, bounds)

@@ -26,6 +26,7 @@ module clm_varcon
   !
   ! !PUBLIC MEMBER FUNCTIONS:
   public :: clm_varcon_init  ! initialize constants in clm_varcon
+  public :: clm_varcon_clean ! clean up clm_varcon arrays
   !
   ! !REVISION HISTORY:
   ! Created by Mariana Vertenstein
@@ -300,5 +301,34 @@ contains
     end if
 
   end subroutine clm_varcon_init
+
+  !------------------------------------------------------------------------------
+  subroutine clm_varcon_clean( )
+    !
+    ! !DESCRIPTION:
+    ! This subroutine deallocate clm_varcon arrays
+    !
+    ! !USES:
+    !
+    ! !ARGUMENTS:
+    implicit none
+    !
+    ! !REVISION HISTORY:
+    !   Created by E. Kluzek
+!------------------------------------------------------------------------------
+
+    if ( allocated(zlak)    ) deallocate( zlak    )
+    if ( allocated(dzlak)   ) deallocate( dzlak   )
+    if ( allocated(zsoi)    ) deallocate( zsoi    )
+    if ( allocated(dzsoi)   ) deallocate( dzsoi   )
+    if ( allocated(zisoi)   ) deallocate( zisoi   )
+    if ( allocated(dzsoi_decomp) ) deallocate( dzsoi_decomp )
+    if ( allocated(nlvic)   ) deallocate( nlvic   )
+    if ( allocated(dzvic)   ) deallocate( dzvic   )
+    if ( allocated(zsoifl)  ) deallocate( zsoifl  )
+    if ( allocated(zisoifl) ) deallocate( zisoifl )
+    if ( allocated(dzsoifl) ) deallocate( dzsoifl )
+
+  end subroutine clm_varcon_clean
 
 end module clm_varcon

@@ -49,7 +49,8 @@ module GlacierSurfaceMassBalanceMod
      ! Public routines
      ! ------------------------------------------------------------------------
 
-     procedure, public :: Init
+     procedure, public :: Init                 ! Allocate memory, initialize variables and setup for history and restart
+     procedure, public :: Clean                ! Deallocate memory
 
      ! The science routines need to be separated into a few pieces so they can be
      ! sequenced properly based on what variables they depend on, and what they affect
@@ -57,6 +58,11 @@ module GlacierSurfaceMassBalanceMod
      procedure, public :: ComputeSurfaceMassBalance ! compute fluxes other than ice melt
      procedure, public :: AdjustRunoffTerms    ! adjust liquid and ice runoff fluxes due to glacier fluxes
 
+     ! ------------------------------------------------------------------------
+     ! Public routines for unit testing
+     ! ------------------------------------------------------------------------
+     procedure, public :: GetFreeze    ! Return qflx_glcice_frz
+     procedure, public :: GetMelt      ! Return qflx_glcice_melt_col
      ! ------------------------------------------------------------------------
      ! Private routines
      ! ------------------------------------------------------------------------
@@ -154,6 +160,40 @@ contains
     end do
 
   end subroutine InitCold
+
+  !-----------------------------------------------------------------------
+  subroutine Clean(this)
+    class(glacier_smb_type), intent(inout) :: this
+
+    !-----------------------------------------------------------------------
+
+    deallocate(this%qflx_glcice_col               )
+    deallocate(this%qflx_glcice_dyn_water_flux_col)
+    deallocate(this%qflx_glcice_frz_col )
+    deallocate(this%qflx_glcice_melt_col)
+  end subroutine Clean
+
+  !-----------------------------------------------------------------------
+  subroutine GetFreeze( this, bounds, Freeze )
+    class(glacier_smb_type), intent(inout) :: this
+    type(bounds_type), intent(in) :: bounds
+    real(r8), allocatable, intent(out) :: Freeze(:)
+    !-----------------------------------------------------------------------
+    allocate(Freeze(bounds%begc:bounds%endc))
+    Freeze(:) = this%qflx_glcice_frz_col(:)
+
+  end subroutine GetFreeze
+
+  !-----------------------------------------------------------------------
+  subroutine GetMelt( this, bounds, Melt )
+    class(glacier_smb_type), intent(inout) :: this
+    type(bounds_type), intent(in) :: bounds
+    real(r8), allocatable, intent(out) :: Melt(:)
+    !-----------------------------------------------------------------------
+    allocate(Melt(bounds%begc:bounds%endc))
+    Melt(:) = this%qflx_glcice_melt_col(:)
+
+  end subroutine GetMelt
 
   ! ========================================================================
   ! Science routines
@@ -262,6 +302,7 @@ contains
     !
     ! !LOCAL VARIABLES:
     integer :: fc, c, l, g
+    real(r8) :: dtime ! land model time step (sec)
 
     character(len=*), parameter :: subname = 'ComputeSurfaceMassBalance'
     !-----------------------------------------------------------------------
@@ -273,8 +314,11 @@ contains
          qflx_glcice_melt           => this%qflx_glcice_melt_col               , & ! Input: [real(r8) (:)] ice melt (positive definite) (mm H2O/s)
          glc_dyn_runoff_routing     => glc2lnd_inst%glc_dyn_runoff_routing_grc , & ! Input:  [real(r8) (:)]  whether we're doing runoff routing appropriate for having a dynamic icesheet
          snow_persistence           => waterstate_inst%snow_persistence_col    , & ! Input: [real(r8) (:)]  counter for length of time snow-covered
+         h2osno                     => waterstate_inst%h2osno_col              , & ! Input: [real(r8) (:)] col snow water (mm H2O)
+         h2osno_old                 => waterstate_inst%h2osno_old_col          , & ! Input: [real(r8) (:)] col snow mass for previous time step (kg/m2)
          qflx_snwcp_ice             => waterflux_inst%qflx_snwcp_ice_col         & ! Input: [real(r8) (:)]  excess solid h2o due to snow capping (outgoing) (mm H2O /s) [+]
          )
+    dtime = get_step_size()
 
     ! NOTE(wjs, 2016-06-29) The following initialization is done in case the columns
     ! included / excluded in the do_smb_c filter can change mid-run (besides just being
@@ -300,7 +344,7 @@ contains
        ! In the following, we convert glc_snow_persistence_max_days to r8 to avoid overflow
        if ( (snow_persistence(c) >= (real(glc_snow_persistence_max_days, r8) * secspday)) &
             .or. lun%itype(l) == istice_mec) then
-          qflx_glcice_frz(c) = qflx_snwcp_ice(c)
+          qflx_glcice_frz(c) = (h2osno(c) - h2osno_old(c)) / dtime + qflx_snwcp_ice(c)
        else
           qflx_glcice_frz(c) = 0._r8
        end if

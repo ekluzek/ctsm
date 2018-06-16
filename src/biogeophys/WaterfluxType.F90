@@ -118,6 +118,7 @@ module WaterfluxType
      
      procedure, public  :: Init
      procedure, public  :: Restart      
+     procedure, public  :: Clean
      procedure, private :: InitAllocate 
      procedure, private :: InitHistory  
      procedure, private :: InitCold     
@@ -254,6 +255,101 @@ contains
          units = 'mm H2O')
 
   end subroutine InitAllocate
+
+  !------------------------------------------------------------------------
+  subroutine Clean(this)
+    !
+    ! !DESCRIPTION:
+    ! Clean module data structure
+    !
+    ! !USES:
+    !
+    ! !ARGUMENTS:
+    class(waterflux_type) :: this
+    !
+    ! !LOCAL VARIABLES:
+    !------------------------------------------------------------------------
+
+    deallocate(this%qflx_prec_intr_patch     )
+    deallocate(this%qflx_prec_grnd_patch     )
+    deallocate(this%qflx_rain_grnd_patch     )
+    deallocate(this%qflx_snow_grnd_patch     )
+    deallocate(this%qflx_sub_snow_patch      )
+    deallocate(this%qflx_tran_veg_patch      )
+
+    deallocate(this%qflx_snowindunload_patch )
+    deallocate(this%qflx_snowindunload_col   )
+    deallocate(this%qflx_snotempunload_patch )
+    deallocate(this%qflx_snotempunload_col   )
+
+    deallocate(this%qflx_dew_grnd_patch      )
+    deallocate(this%qflx_dew_snow_patch      )
+
+    deallocate(this%qflx_prec_intr_col       )
+    deallocate(this%qflx_prec_grnd_col       )
+    deallocate(this%qflx_rain_grnd_col       )
+    deallocate(this%qflx_snow_grnd_col       )
+    deallocate(this%qflx_sub_snow_col        )
+    deallocate(this%qflx_snwcp_liq_col       )
+    deallocate(this%qflx_snwcp_ice_col       )
+    deallocate(this%qflx_snwcp_discarded_liq_col)
+    deallocate(this%qflx_snwcp_discarded_ice_col)
+    deallocate(this%qflx_tran_veg_col        )
+    deallocate(this%qflx_evap_veg_col        )
+    deallocate(this%qflx_evap_can_col        )
+    deallocate(this%qflx_evap_soi_col        )
+    deallocate(this%qflx_evap_tot_col        )
+    deallocate(this%qflx_evap_grnd_col       )
+    deallocate(this%qflx_dew_grnd_col        )
+    deallocate(this%qflx_dew_snow_col        )
+    deallocate(this%qflx_evap_veg_patch      )
+    deallocate(this%qflx_evap_can_patch      )
+    deallocate(this%qflx_evap_soi_patch      )
+    deallocate(this%qflx_evap_tot_patch      )
+    deallocate(this%qflx_evap_grnd_patch     )
+    deallocate(this%qflx_phs_neg_col         )
+
+    deallocate( this%qflx_ev_snow_patch      )
+    deallocate( this%qflx_ev_snow_col        )
+    deallocate( this%qflx_ev_soil_patch      )
+    deallocate( this%qflx_ev_soil_col        )
+    deallocate( this%qflx_ev_h2osfc_patch    )
+    deallocate( this%qflx_ev_h2osfc_col      )
+
+    deallocate(this%qflx_drain_vr_col        )
+    deallocate(this%qflx_adv_col             )
+    deallocate(this%qflx_rootsoi_col         )
+    deallocate(this%qflx_infl_col            )
+    deallocate(this%qflx_surf_col            )
+    deallocate(this%qflx_drain_col           )
+    deallocate(this%qflx_top_soil_col        )
+    deallocate(this%qflx_h2osfc_to_ice_col   )
+    deallocate(this%qflx_h2osfc_surf_col     )
+    deallocate(this%qflx_snow_h2osfc_col     )
+    deallocate(this%qflx_snomelt_col         )
+    deallocate(this%qflx_snomelt_lyr_col     )
+    deallocate(this%qflx_snow_drain_col      )
+    deallocate(this%qflx_snofrz_col          )
+    deallocate(this%qflx_snofrz_lyr_col      )
+    deallocate(this%qflx_qrgwl_col           )
+    deallocate(this%qflx_drain_perched_col   )
+    deallocate(this%qflx_deficit_col         )
+    deallocate(this%qflx_floodc_col          )
+    deallocate(this%qflx_sl_top_soil_col     )
+    deallocate(this%qflx_runoff_col          )
+    deallocate(this%qflx_runoff_r_col        )
+    deallocate(this%qflx_runoff_u_col        )
+    deallocate(this%qflx_ice_runoff_snwcp_col)
+    deallocate(this%qflx_ice_runoff_xs_col   )
+    deallocate(this%qflx_rsub_sat_col        )
+    deallocate(this%snow_sources_col         )
+    deallocate(this%snow_sinks_col           )
+
+    deallocate(this%qflx_liq_dynbal_grc      )
+    deallocate(this%qflx_ice_dynbal_grc      )
+    deallocate(this%AnnET                    )
+
+  end subroutine Clean
 
   !------------------------------------------------------------------------
   subroutine InitHistory(this, bounds)

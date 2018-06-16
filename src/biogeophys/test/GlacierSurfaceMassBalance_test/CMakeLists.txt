@@ -1,0 +1,4 @@
+create_pFUnit_test(glacier_surface_mass_balance test_glacier_surface_mass_balance_exe
+  "test_glacier_surface_mass_balance.pf" "")
+
+target_link_libraries(test_glacier_surface_mass_balance_exe clm csm_share esmf_wrf_timemgr)
