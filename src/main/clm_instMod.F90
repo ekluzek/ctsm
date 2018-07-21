@@ -186,7 +186,6 @@ contains
     use SoilBiogeochemDecompCascadeContype , only : init_decomp_cascade_constants
     use SoilBiogeochemCompetitionMod       , only : SoilBiogeochemCompetitionInit
     
-    use EDTypesMod                         , only : ed_hist_scpfmaps
     use initVerticalMod                    , only : initVertical
     use accumulMod                         , only : print_accum_fields 
     use SoilWaterRetentionCurveFactoryMod  , only : create_soil_water_retention_curve
@@ -255,10 +254,6 @@ contains
          snow_depth_col(begc:endc),              &
          urbanparams_inst%thick_wall(begl:endl), &
          urbanparams_inst%thick_roof(begl:endl))
-
-    if(use_fates)then
-      call ed_hist_scpfmaps
-    end if
 
     ! Initialize clm->drv and drv->clm data structures
 
