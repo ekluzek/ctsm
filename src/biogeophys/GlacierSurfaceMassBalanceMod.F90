@@ -12,7 +12,6 @@ module GlacierSurfaceMassBalanceMod
   use decompMod      , only : bounds_type
   use clm_varcon     , only : spval, secspday
   use clm_varpar     , only : nlevgrnd
-  use clm_varctl     , only : glc_snow_persistence_max_days
   use clm_time_manager, only : get_step_size
   use landunit_varcon, only : istice_mec
   use ColumnType     , only : col                
@@ -20,6 +19,7 @@ module GlacierSurfaceMassBalanceMod
   use glc2lndMod     , only : glc2lnd_type
   use WaterstateType , only : waterstate_type
   use WaterfluxType  , only : waterflux_type
+  use abortutils     , only : endrun
 
   ! !PUBLIC TYPES:
   implicit none
@@ -42,6 +42,7 @@ module GlacierSurfaceMassBalanceMod
 
      real(r8), pointer :: qflx_glcice_frz_col (:)   ! col ice growth (positive definite) (mm H2O/s); only valid inside the do_smb_c filter
      real(r8), pointer :: qflx_glcice_melt_col(:)   ! col ice melt (positive definite) (mm H2O/s); only valid inside the do_smb_c filter
+
 
    contains
 
@@ -70,8 +71,17 @@ module GlacierSurfaceMassBalanceMod
      procedure, private :: InitAllocate
      procedure, private :: InitHistory
      procedure, private :: InitCold
+     procedure, private :: InitReadNML
 
   end type glacier_smb_type
+
+  !----------------------------------------------------------
+  ! glacier_mec control variables: default values (may be overwritten by namelist)
+  !----------------------------------------------------------
+
+  ! number of days before one considers the perennially snow-covered point 'land ice'
+  ! ONLY PUBLIC FOR UNIT_TESTING!
+  integer , public :: glc_snow_persistence_max_days = 7300
 
   character(len=*), parameter, private :: sourcefile = &
        __FILE__
@@ -83,14 +93,18 @@ contains
   ! ========================================================================
 
   !-----------------------------------------------------------------------
-  subroutine Init(this, bounds)
+  subroutine Init(this, bounds, NLFilename)
     class(glacier_smb_type), intent(inout) :: this
     type(bounds_type), intent(in) :: bounds
+    character(len=*),  intent(in) :: NLFilename
     !-----------------------------------------------------------------------
 
     call this%InitAllocate(bounds)
     call this%InitHistory(bounds)
     call this%InitCold(bounds)
+    if ( len_trim(NLFilename) > 0 )then
+       call this%InitReadNML( NLFilename )
+    end if
   end subroutine Init
 
   !-----------------------------------------------------------------------
@@ -160,6 +174,55 @@ contains
     end do
 
   end subroutine InitCold
+
+  !-----------------------------------------------------------------------
+  subroutine InitReadNML(this, NLFilename)
+    ! Read the glacier surface mass balance namelist
+    ! !USES:
+    use fileutils      , only : getavu, relavu, opnfil
+    use shr_nl_mod     , only : shr_nl_find_group_name
+    use spmdMod        , only : masterproc, mpicom
+    use shr_mpi_mod    , only : shr_mpi_bcast
+    use clm_varctl     , only : iulog
+    implicit none
+    class(glacier_smb_type), intent(inout) :: this
+    character(len=*),  intent(in) :: NLFilename
+    ! !LOCAL VARIABLES:
+    integer :: ierr                 ! error code
+    integer :: unitn                ! unit for namelist file
+
+    character(len=*), parameter :: subname = 'Glacier_SurfaceMassBalance::InitReadNML'
+    character(len=*), parameter :: nmlname = 'glacier_smb'
+
+    ! Glacier_mec info
+    namelist /glacier_smb/ &
+         glc_snow_persistence_max_days
+
+    if (masterproc) then
+       unitn = getavu()
+       write(iulog,*) 'Read in '//nmlname//'  namelist'
+       call opnfil (NLFilename, unitn, 'F')
+       call shr_nl_find_group_name(unitn, nmlname, status=ierr)
+       if (ierr == 0) then
+          read(unitn, nml=glacier_smb, iostat=ierr)
+          if (ierr /= 0) then
+             call endrun(msg="ERROR reading "//nmlname//"namelist"//errmsg(sourcefile, __LINE__))
+          end if
+       else
+          call endrun(msg="ERROR could NOT find "//nmlname//"namelist"//errmsg(sourcefile, __LINE__))
+       end if
+       call relavu( unitn )
+    end if
+
+    call shr_mpi_bcast (glc_snow_persistence_max_days, mpicom)
+
+    if (masterproc) then
+       write(iulog,*) '   glc snow persistence max days = ', glc_snow_persistence_max_days
+    end if
+    !-----------------------------------------------------------------------
+
+  end subroutine InitReadNML
+
 
   !-----------------------------------------------------------------------
   subroutine Clean(this)

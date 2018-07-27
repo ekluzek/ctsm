@@ -285,7 +285,7 @@ contains
 
     call waterflux_inst%Init(bounds)
 
-    call glacier_smb_inst%Init(bounds)
+    call glacier_smb_inst%Init(bounds, nlfilename)
 
     ! COMPILER_BUG(wjs, 2014-11-29, pgi 14.7) Without the following assignment, the
     ! assertion in energyflux_inst%Init fails with pgi 14.7 on yellowstone, presumably due

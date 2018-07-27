@@ -193,7 +193,6 @@ contains
     ! Glacier_mec info
     namelist /clm_inparm/ &    
          maxpatch_glcmec, glc_do_dynglacier, &
-         glc_snow_persistence_max_days, &
          nlevsno, h2osno_max, int_snow_max, n_melt_glcmec
 
     ! Other options
@@ -717,7 +716,6 @@ contains
     ! glacier_mec variables
     call mpi_bcast (maxpatch_glcmec, 1, MPI_INTEGER, 0, mpicom, ier)
     call mpi_bcast (glc_do_dynglacier, 1, MPI_LOGICAL, 0, mpicom, ier)
-    call mpi_bcast (glc_snow_persistence_max_days, 1, MPI_INTEGER, 0, mpicom, ier)
 
     ! history file variables
     call mpi_bcast (hist_empty_htapes, 1, MPI_LOGICAL, 0, mpicom, ier)
@@ -885,7 +883,6 @@ contains
     else
        write(iulog,*) '   glc CLM glacier areas and topography will NOT evolve dynamically'
     end if
-    write(iulog,*) '   glc snow persistence max days = ', glc_snow_persistence_max_days
 
     if (nsrest == nsrStartup) then
        if (finidat /= ' ') then

@@ -63,6 +63,7 @@ contains
 
 
     integer :: c
+    character(len=256) :: nlfilename = ' '
     
     call clm_varpar_init()
     call clm_varcon_clean()
@@ -96,7 +97,7 @@ contains
     end do
     call unittest_timemgr_setup(dtime=dtime)
     call set_date(yr=1850, mon=1, day=1, tod=0)
-    call this%glcsmb%Init(bounds)
+    call this%glcsmb%Init(bounds,nlfilename)
     call this%waterflux_inst%Init(bounds)
     call this%glc_behavior%InitSetDirectly(bounds%begg, bounds%endg, &
          has_virtual_columns = grc_array(.false.), &
@@ -200,7 +201,6 @@ contains
 
   @Test
   subroutine ComputeSurfaceMassBalanceNoRouteNoMeltNoPSnow_Test( this )
-    use clm_varctl , only: glc_snow_persistence_max_days
     use clm_varcon , only: secspday
     class(TestGSMB), intent(inout) :: this
     real(r8), allocatable :: Freeze(:)
@@ -241,7 +241,6 @@ contains
 
   @Test
   subroutine ComputeSurfaceMassBalanceOneRouteNoMeltPSnow_Test( this )
-    use clm_varctl , only: glc_snow_persistence_max_days
     use clm_varcon , only: secspday
     class(TestGSMB), intent(inout) :: this
     real(r8), allocatable :: Freeze(:)
@@ -280,7 +279,6 @@ contains
 
   @Test
   subroutine ComputeSurfaceMassBalanceOneRouteMeltEqFreezePSnow_Test( this )
-    use clm_varctl , only: glc_snow_persistence_max_days
     use clm_varcon , only: secspday
     class(TestGSMB), intent(inout) :: this
     real(r8), allocatable :: Freeze(:)
@@ -321,7 +319,6 @@ contains
 
   @Test
   subroutine ComputeSurfaceMassBalanceOneRouteSnoIncrease_Test( this )
-    use clm_varctl , only: glc_snow_persistence_max_days
     use clm_varcon , only: secspday
     class(TestGSMB), intent(inout) :: this
     real(r8), allocatable :: Freeze(:)
