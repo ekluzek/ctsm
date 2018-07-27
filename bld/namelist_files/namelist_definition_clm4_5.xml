@@ -518,6 +518,16 @@ Thus, in general, large values of h2osno_max should have glc_snow_persistence_ma
 small values of h2osno_max should have glc_snow_persistence_max_days > 0.
 </entry>
 
+<entry id="glc_smb_include_snowpack" type="logical" category="clm_physics"
+       group="glacier_smb" valid_values="" >
+Whether to include the snowpack into the glacier surface mass balance or not
+</entry>
+
+<entry id="glc_snow_min_swe" type="real" category="clm_physics"
+       group="glacier_smb" valid_values="" >
+The minimum amount of snow water equivalent for glacier inception to happen
+</entry>
+
 <entry id="albice" type="real(2)" category="clm_physics"
        group="clm_inparm" >
 Visible and Near-infrared albedo's for glacier ice
