@@ -10,7 +10,7 @@ module GlacierSurfaceMassBalanceMod
   use shr_log_mod    , only : errMsg => shr_log_errMsg
   use shr_infnan_mod , only : nan => shr_infnan_nan, assignment(=)
   use decompMod      , only : bounds_type
-  use clm_varcon     , only : spval, secspday
+  use clm_varcon     , only : spval, secspday, h2osno_max
   use clm_varpar     , only : nlevgrnd
   use clm_time_manager, only : get_step_size
   use landunit_varcon, only : istice_mec
@@ -82,6 +82,8 @@ module GlacierSurfaceMassBalanceMod
   ! number of days before one considers the perennially snow-covered point 'land ice'
   ! ONLY PUBLIC FOR UNIT_TESTING!
   integer , public :: glc_snow_persistence_max_days = 7300
+  real(r8), public :: glc_snow_min_swe
+  logical , public :: glc_smb_include_snowpack      = .true.
 
   character(len=*), parameter, private :: sourcefile = &
        __FILE__
@@ -102,6 +104,7 @@ contains
     call this%InitAllocate(bounds)
     call this%InitHistory(bounds)
     call this%InitCold(bounds)
+    glc_snow_min_swe = h2osno_max
     if ( len_trim(NLFilename) > 0 )then
        call this%InitReadNML( NLFilename )
     end if
@@ -196,7 +199,7 @@ contains
 
     ! Glacier_mec info
     namelist /glacier_smb/ &
-         glc_snow_persistence_max_days
+         glc_snow_persistence_max_days, glc_snow_min_swe, glc_smb_include_snowpack
 
     if (masterproc) then
        unitn = getavu()
@@ -215,9 +218,23 @@ contains
     end if
 
     call shr_mpi_bcast (glc_snow_persistence_max_days, mpicom)
+    call shr_mpi_bcast (glc_snow_min_swe,              mpicom)
+    call shr_mpi_bcast (glc_smb_include_snowpack,      mpicom)
+
+    if ( glc_snow_persistence_max_days < 0 )then
+       call endrun(msg="ERROR glc_snow_persistence_max_days is negative and can not be")
+    end if
+    if ( glc_snow_min_swe <= 0.0_r8 )then
+       call endrun(msg="ERROR glc_snow_min_swe is negative or zero and can not be")
+    end if
+    if ( glc_snow_min_swe > h2osno_max )then
+       call endrun(msg="ERROR glc_snow_min_swe is greater than h2osno_max and can not be")
+    end if
 
     if (masterproc) then
-       write(iulog,*) '   glc snow persistence max days = ', glc_snow_persistence_max_days
+       write(iulog,*) '   glc snow persistence max days      = ', glc_snow_persistence_max_days
+       write(iulog,*) '   glc snow min snow water equivalent = ', glc_snow_min_swe
+       write(iulog,*) '   glc surf. mass bal. includes snow  = ', glc_smb_include_snowpack
     end if
     !-----------------------------------------------------------------------
 
