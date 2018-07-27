@@ -3831,6 +3831,7 @@ sub write_output_files {
       push @groups, "lifire_inparm";
       push @groups, "ch4finundated";
       push @groups, "clm_canopy_inparm";
+      push @groups, "glacier_smb";
     }
   }
 
