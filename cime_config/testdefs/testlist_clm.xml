@@ -1669,7 +1669,8 @@
     </machines>
     <options>
       <option name="wallclock">00:20:00</option>
-    </options>
+    </options>tes"
+
   </test>
   <test name="ERS_D_Mmpi-serial_Ld5" grid="5x5_amazon" compset="I2000Clm45FatesGs" testmods="clm/FatesColdDef">
     <machines>
@@ -1817,7 +1818,7 @@
       <option name="wallclock">00:20:00</option>
     </options>
   </test>
-  <test name="ERP_Ld9" grid="f45_f45_mg37" compset="I2000Clm50FatesCruGs" testmods="clm/FatesAllVars">
+  <test name="SMS_Ld9" grid="f45_f45_mg37" compset="I2000Clm50FatesCruGs" testmods="clm/FatesColdDefAllVars">
     <machines>
       <machine name="cheyenne" compiler="intel" category="fates"/>
       <machine name="edison" compiler="intel" category="fates"/>
@@ -1888,7 +1889,7 @@
       <option name="wallclock">00:40:00</option>
     </options>
   </test>
-  <test name="ERS_Ld60" grid="f45_f45_mg37" compset="I2000Clm50FatesCruGs" testmods="clm/FatesNoFire">
+  <test name="SMS_Ld60" grid="f45_f45_mg37" compset="I2000Clm50FatesCruGs" testmods="clm/FatesColdDefNoFire">
     <machines>
       <machine name="cheyenne" compiler="intel" category="fates"/>
       <machine name="lawrencium-lr3" compiler="intel" category="fates"/>
@@ -1897,7 +1898,7 @@
       <option name="wallclock">00:20:00</option>
     </options>
   </test>
-  <test name="ERS_Ld60" grid="f45_f45_mg37" compset="I2000Clm50FatesCruGs" testmods="clm/FatesST3">
+  <test name="SMS_Ld60" grid="f45_f45_mg37" compset="I2000Clm50FatesCruGs" testmods="clm/FatesColdDefST3">
     <machines>
       <machine name="cheyenne" compiler="intel" category="fates"/>
       <machine name="lawrencium-lr3" compiler="intel" category="fates"/>      
@@ -1906,7 +1907,7 @@
       <option name="wallclock">00:20:00</option>
     </options>
   </test>
-  <test name="ERS_Ld60" grid="f45_f45_mg37" compset="I2000Clm50FatesCruGs" testmods="clm/FatesPPhys">
+  <test name="SMS_Ld60" grid="f45_f45_mg37" compset="I2000Clm50FatesCruGs" testmods="clm/FatesColdDefPPhys">
     <machines>
       <machine name="cheyenne" compiler="intel" category="fates"/>
       <machine name="lawrencium-lr3" compiler="intel" category="fates"/>
@@ -1915,10 +1916,26 @@
       <option name="wallclock">00:20:00</option>
     </options>
   </test>
-  <test name="ERS_Ld60" grid="f45_f45_mg37" compset="I2000Clm50FatesCruGs" testmods="clm/FatesLogging">
+  <test name="SMS_Ld60" grid="f45_f45_mg37" compset="I2000Clm50FatesCruGs" testmods="clm/FatesColdDefLogging">
     <machines>
       <machine name="cheyenne" compiler="intel" category="fates"/>
       <machine name="lawrencium-lr3" compiler="intel" category="fates"/>
+    </machines>
+    <options>
+      <option name="wallclock">00:20:00</option>
+    </options>
+  </test>
+  <test name="SMS_Ld60" grid="f45_f45_mg37" compset="I2000Clm50FatesCruGs" testmods="clm/FatesColdDefHydro">
+    <machines>
+      <machine name="cheyenne" compiler="intel" category="fates"/>
+    </machines>
+    <options>
+      <option name="wallclock">00:20:00</option>
+    </options>
+  </test>
+  <test name="SMS_Ld60" grid="f45_f45_mg37" compset="I2000Clm50FatesCruGs" testmods="clm/FatesColdDefShortList">
+    <machines>
+      <machine name="hobart" compiler="nag" category="fates"/>
     </machines>
     <options>
       <option name="wallclock">00:20:00</option>
