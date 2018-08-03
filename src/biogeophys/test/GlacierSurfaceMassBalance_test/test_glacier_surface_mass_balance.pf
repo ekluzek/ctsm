@@ -15,7 +15,8 @@ module test_glacier_surface_mass_balance
   use WaterstateType , only : waterstate_type
   use WaterfluxType  , only : waterflux_type
   use glcBehaviorMod , only : glc_behavior_type
-  use domainMod, only : ldomain
+  use domainMod      , only : ldomain
+  use unittestUtils  , only : endrun_msg
 
   implicit none
 
@@ -414,5 +415,16 @@ contains
     this%expected(bounds%endc) = iceamt
     @assertEqual( this%expected(:), this%qflx_ice_runoff_snwcp(:) )
   end subroutine AdjustRunoffTermsOneRouteMeltEqSnowcap_Test
+
+  @Test
+  subroutine NegativeSnowFail_Test( this )
+    class(TestGSMB), intent(inout) :: this
+
+    glc_snow_min_swe = -10.d00
+    call this%glcsmb%Init(bounds,nlfilename=' ')
+    expected_msg = endrun_msg( &
+         'ERROR glc_snow_min_swe is negative or zero and can not be' )
+    @assertExceptionRaised(expected_msg)
+  end subroutine NegativeSnowFail_Test
 
 end module test_glacier_surface_mass_balance
