@@ -1669,8 +1669,7 @@
     </machines>
     <options>
       <option name="wallclock">00:20:00</option>
-    </options>tes"
-
+    </options>
   </test>
   <test name="ERS_D_Mmpi-serial_Ld5" grid="5x5_amazon" compset="I2000Clm45FatesGs" testmods="clm/FatesColdDef">
     <machines>
