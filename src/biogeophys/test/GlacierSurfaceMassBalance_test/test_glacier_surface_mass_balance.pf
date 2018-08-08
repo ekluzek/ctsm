@@ -98,6 +98,9 @@ contains
     end do
     call unittest_timemgr_setup(dtime=dtime)
     call set_date(yr=1850, mon=1, day=1, tod=0)
+    h2osno_max = 10000.0_r8
+    glc_snow_persistence_max_days = 7300
+    glc_smb_include_snowpack = .true.
     call this%glcsmb%Init(bounds,nlfilename)
     call this%waterflux_inst%Init(bounds)
     call this%glc_behavior%InitSetDirectly(bounds%begg, bounds%endg, &
@@ -121,7 +124,6 @@ contains
     allocate( this%qflx_ice_runoff_snwcp( bounds%begc:bounds%endc ) )
     this%qflx_qrgwl(:)            = 0.0_r8
     this%qflx_ice_runoff_snwcp(:) = 0.0_r8
-    h2osno_max = 10000.0_r8
     this%waterstate_inst%h2osno_col(:)     = h2osno_max
     this%waterstate_inst%h2osno_old_col(:) = h2osno_max
 
@@ -420,11 +422,54 @@ contains
   subroutine NegativeSnowFail_Test( this )
     class(TestGSMB), intent(inout) :: this
 
+    character(len=256) :: expected_msg
+
     glc_snow_min_swe = -10.d00
-    call this%glcsmb%Init(bounds,nlfilename=' ')
+    call this%glcsmb%CheckNML()
     expected_msg = endrun_msg( &
-         'ERROR glc_snow_min_swe is negative or zero and can not be' )
+         "ERROR glc_snow_min_swe is negative or zero and can not be" )
     @assertExceptionRaised(expected_msg)
   end subroutine NegativeSnowFail_Test
+
+  @Test
+  subroutine TooLargeSnowFail_Test( this )
+    use clm_varcon                    , only : h2osno_max
+    class(TestGSMB), intent(inout) :: this
+
+    character(len=256) :: expected_msg
+
+    glc_snow_min_swe = h2osno_max + 1
+    call this%glcsmb%CheckNML()
+    expected_msg = endrun_msg( &
+         "ERROR glc_snow_min_swe is greater than h2osno_max and can not be" )
+    @assertExceptionRaised(expected_msg)
+  end subroutine TooLargeSnowFail_Test
+
+  @Test
+  subroutine h2osnomaxnotsetFail_Test( this )
+    use clm_varcon                    , only : h2osno_max
+    class(TestGSMB), intent(inout) :: this
+
+    character(len=256) :: expected_msg
+
+    h2osno_max = -999.0_r8
+    call this%glcsmb%CheckNML()
+    expected_msg = endrun_msg( &
+         "ERROR h2osno_max MUST be set before glacier_smb_type Init" )
+    @assertExceptionRaised(expected_msg)
+  end subroutine h2osnomaxnotsetFail_Test
+
+  @Test
+  subroutine NegativeSnowPersistFail_Test( this )
+    class(TestGSMB), intent(inout) :: this
+
+    character(len=256) :: expected_msg
+
+    glc_snow_persistence_max_days = -1
+    call this%glcsmb%CheckNML()
+    expected_msg = endrun_msg( &
+         "ERROR glc_snow_persistence_max_days is negative and can not be" )
+    @assertExceptionRaised(expected_msg)
+  end subroutine NegativeSnowPersistFail_Test
 
 end module test_glacier_surface_mass_balance

@@ -64,6 +64,7 @@ module GlacierSurfaceMassBalanceMod
      ! ------------------------------------------------------------------------
      procedure, public :: GetFreeze    ! Return qflx_glcice_frz
      procedure, public :: GetMelt      ! Return qflx_glcice_melt_col
+     procedure, public :: CheckNML     ! Check namelist settings
      ! ------------------------------------------------------------------------
      ! Private routines
      ! ------------------------------------------------------------------------
@@ -108,6 +109,7 @@ contains
     if ( len_trim(NLFilename) > 0 )then
        call this%InitReadNML( NLFilename )
     end if
+    call this%CheckNML( )
   end subroutine Init
 
   !-----------------------------------------------------------------------
@@ -220,7 +222,21 @@ contains
     call shr_mpi_bcast (glc_snow_persistence_max_days, mpicom)
     call shr_mpi_bcast (glc_snow_min_swe,              mpicom)
     call shr_mpi_bcast (glc_smb_include_snowpack,      mpicom)
+  end subroutine InitReadNML
 
+  !-----------------------------------------------------------------------
+  subroutine CheckNML(this)
+    ! Check the values from the Namelist
+    ! !USES:
+    use spmdMod        , only : masterproc, mpicom
+    use clm_varctl     , only : iulog
+    implicit none
+    class(glacier_smb_type), intent(inout) :: this
+
+    if ( h2osno_max <= 0.0_r8 )then
+       call endrun(msg="ERROR h2osno_max MUST be set before glacier_smb_type Init")
+       return
+    end if
     if ( glc_snow_persistence_max_days < 0 )then
        call endrun(msg="ERROR glc_snow_persistence_max_days is negative and can not be")
     end if
@@ -238,7 +254,7 @@ contains
     end if
     !-----------------------------------------------------------------------
 
-  end subroutine InitReadNML
+  end subroutine CheckNML
 
 
   !-----------------------------------------------------------------------
