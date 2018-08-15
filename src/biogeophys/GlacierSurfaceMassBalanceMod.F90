@@ -440,7 +440,11 @@ contains
        ! In the following, we convert glc_snow_persistence_max_days to r8 to avoid overflow
        if ( (snow_persistence(c) >= (real(glc_snow_persistence_max_days, r8) * secspday)) &
             .or. lun%itype(l) == istice_mec) then
-          qflx_glcice_frz(c) = (h2osno(c) - h2osno_old(c)) / dtime + qflx_snwcp_ice(c)
+          qflx_glcice_frz(c) = qflx_snwcp_ice(c)
+          ! If SMB for glaciers include snowpack...
+          if ( glc_smb_include_snowpack )then
+             qflx_glcice_frz(c) = (h2osno(c) - h2osno_old(c)) / dtime + qflx_glcice_frz(c)
+          end if
        else
           qflx_glcice_frz(c) = 0._r8
        end if
