@@ -62,9 +62,10 @@ module GlacierSurfaceMassBalanceMod
      ! ------------------------------------------------------------------------
      ! Public routines for unit testing
      ! ------------------------------------------------------------------------
-     procedure, public :: GetFreeze    ! Return qflx_glcice_frz
-     procedure, public :: GetMelt      ! Return qflx_glcice_melt_col
-     procedure, public :: CheckNML     ! Check namelist settings
+     procedure, public :: GlacialInceptionTrigger ! Logical function to flag if this column should now be treated as glacier
+     procedure, public :: GetFreeze               ! Return qflx_glcice_frz
+     procedure, public :: GetMelt                 ! Return qflx_glcice_melt_col
+     procedure, public :: CheckNML                ! Check namelist settings
      ! ------------------------------------------------------------------------
      ! Private routines
      ! ------------------------------------------------------------------------
@@ -256,6 +257,26 @@ contains
 
   end subroutine CheckNML
 
+  !-----------------------------------------------------------------------
+  logical function GlacialInceptionTrigger( this, waterstate_inst, c )
+    ! Return true for a column that should now be treated as glacier
+    ! Glacial inception requires both snow persistence to be greater than desired input value and 
+    ! snow water equiv. to be greater than desired input value
+    ! !USES:
+    implicit none
+    class(glacier_smb_type), intent(inout) :: this             ! Glacier Surface Mass Balance instance
+    type(waterstate_type)  , intent(in)    :: waterstate_inst  ! Waterstate instance
+    integer                , intent(in)    :: c                ! Column to test
+
+    ! In the following, we convert glc_snow_persistence_max_days to r8 to avoid overflow
+    if ( (waterstate_inst%snow_persistence_col(c) >= (real(glc_snow_persistence_max_days, r8) * secspday) ) .and. &
+         (waterstate_inst%h2osno_col(c) >= glc_snow_min_swe) ) then
+         GlacialInceptionTrigger = .true.
+    else
+         GlacialInceptionTrigger = .false.
+    end if
+
+  end function GlacialInceptionTrigger
 
   !-----------------------------------------------------------------------
   subroutine Clean(this)
