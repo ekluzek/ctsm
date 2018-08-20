@@ -441,7 +441,7 @@ contains
     glc_snow_min_swe = -10.d00
     call this%glcsmb%CheckNML()
     expected_msg = endrun_msg( &
-         "ERROR glc_snow_min_swe is negative or zero and can not be" )
+         "ERROR glc_snow_min_swe is negative or less than zero and can not be" )
     @assertExceptionRaised(expected_msg)
   end subroutine NegativeSnowFail_Test
 
@@ -515,6 +515,10 @@ contains
      @assertTrue( this%glcsmb%GlacialInceptionTrigger( this%waterstate_inst, c=c), message="after persist at min snow" )
      this%waterstate_inst%h2osno_col(:) = glc_snow_min_swe - 1.0_r8
      @assertFalse( this%glcsmb%GlacialInceptionTrigger( this%waterstate_inst, c=c), message="after persist at less snow" )
+     ! if min swe is zero, snow depth won't matter
+     glc_snow_min_swe = 0.0_r8
+     this%waterstate_inst%h2osno_col(:) = 0.0_r8
+     @assertTrue( this%glcsmb%GlacialInceptionTrigger( this%waterstate_inst, c=c), message="after persist no snow and zero min snow" )
  
    end subroutine GlacialInceptionTrigger_Test
 

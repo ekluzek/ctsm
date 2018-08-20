@@ -74,6 +74,7 @@ module GlacierSurfaceMassBalanceMod
      procedure, private :: InitHistory
      procedure, private :: InitCold
      procedure, private :: InitReadNML
+     procedure, private :: InitNML
 
   end type glacier_smb_type
 
@@ -83,9 +84,9 @@ module GlacierSurfaceMassBalanceMod
 
   ! number of days before one considers the perennially snow-covered point 'land ice'
   ! ONLY PUBLIC FOR UNIT_TESTING!
-  integer , public :: glc_snow_persistence_max_days = 7300
-  real(r8), public :: glc_snow_min_swe
-  logical , public :: glc_smb_include_snowpack      = .true.
+  integer , public, save :: glc_snow_persistence_max_days
+  real(r8), public, save :: glc_snow_min_swe
+  logical , public, save :: glc_smb_include_snowpack
 
   character(len=*), parameter, private :: sourcefile = &
        __FILE__
@@ -106,7 +107,8 @@ contains
     call this%InitAllocate(bounds)
     call this%InitHistory(bounds)
     call this%InitCold(bounds)
-    glc_snow_min_swe = h2osno_max
+
+    call this%InitNML()
     if ( len_trim(NLFilename) > 0 )then
        call this%InitReadNML( NLFilename )
     end if
@@ -181,6 +183,18 @@ contains
 
   end subroutine InitCold
 
+
+  !-----------------------------------------------------------------------
+  subroutine InitNML(this)
+    class(glacier_smb_type), intent(inout) :: this
+
+    !-----------------------------------------------------------------------
+    glc_snow_persistence_max_days = 7300
+    glc_snow_min_swe              = 0.0_r8
+    glc_smb_include_snowpack      = .true.
+
+  end subroutine InitNML
+
   !-----------------------------------------------------------------------
   subroutine InitReadNML(this, NLFilename)
     ! Read the glacier surface mass balance namelist
@@ -241,8 +255,8 @@ contains
     if ( glc_snow_persistence_max_days < 0 )then
        call endrun(msg="ERROR glc_snow_persistence_max_days is negative and can not be")
     end if
-    if ( glc_snow_min_swe <= 0.0_r8 )then
-       call endrun(msg="ERROR glc_snow_min_swe is negative or zero and can not be")
+    if ( glc_snow_min_swe < 0.0_r8 )then
+       call endrun(msg="ERROR glc_snow_min_swe is negative or less than zero and can not be")
     end if
     if ( glc_snow_min_swe > h2osno_max )then
        call endrun(msg="ERROR glc_snow_min_swe is greater than h2osno_max and can not be")
@@ -458,9 +472,7 @@ contains
        c = filter_do_smb_c(fc)
        l = col%landunit(c)
        g = col%gridcell(c)
-       ! In the following, we convert glc_snow_persistence_max_days to r8 to avoid overflow
-       if ( (snow_persistence(c) >= (real(glc_snow_persistence_max_days, r8) * secspday)) &
-            .or. lun%itype(l) == istice_mec) then
+       if ( this%GlacialInceptionTrigger( waterstate_inst, c ) .or. lun%itype(l) == istice_mec) then
           qflx_glcice_frz(c) = qflx_snwcp_ice(c)
           ! If SMB for glaciers include snowpack...
           if ( glc_smb_include_snowpack )then
