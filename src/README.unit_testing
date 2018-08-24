@@ -7,7 +7,7 @@
 # existing build directory.
 
 # From a standalone CTSM checkout:
-../cime/scripts/fortran_unit_testing/run_tests.py --build-dir `mktemp -d --tmpdir=. unit_tests.XXXXXXXX`
+../cime/scripts/fortran_unit_testing/run_tests.py --build-dir `mktemp -d -t unit_tests.XXXXXXXX`
 
 # If you are within a full CESM checkout, you would instead do:
 # ../../../cime/scripts/fortran_unit_testing/run_tests.py --build-dir `mktemp -d --tmpdir=. unit_tests.XXXXXXXX`

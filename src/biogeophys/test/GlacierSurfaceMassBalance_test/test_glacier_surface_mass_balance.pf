@@ -21,6 +21,8 @@ module test_glacier_surface_mass_balance
   implicit none
 
   real(r8), parameter :: tol = 1.e-14
+  integer , parameter :: glc_incep_before = 0
+  integer , parameter :: glc_incep_start  = 1
 
   @TestCase
   type, extends(TestCase) :: TestGSMB
@@ -41,9 +43,13 @@ module test_glacier_surface_mass_balance
      real(r8), allocatable :: t_soisno_col(:,:)
      real(r8), allocatable :: expected(:)
      real(r8), allocatable :: expected_layer(:,:)
+     real(r8) :: persistence_tooshort
+     real(r8) :: persistence_longenough
    contains
      procedure :: setUp
      procedure :: tearDown
+     procedure :: runSMBSequence
+     procedure :: persistance
   end type TestGSMB
 
   integer, parameter :: dtime = 1800
@@ -51,6 +57,7 @@ module test_glacier_surface_mass_balance
 contains
 
   subroutine setUp(this)
+    use clm_varcon                    , only : secspday
     use clm_varpar                    , only : clm_varpar_init
     use clm_varcon                    , only : clm_varcon_init, clm_varcon_clean
     use unittestSimpleSubgridSetupsMod, only : setup_single_veg_patch
@@ -100,9 +107,13 @@ contains
     call set_date(yr=1850, mon=1, day=1, tod=0)
     h2osno_max = 10000.0_r8
     glc_snow_persistence_max_days = 7300
+    this%persistence_tooshort = real(glc_snow_persistence_max_days,r8)*secspday - real(dtime,r8)
+    this%persistence_longenough = real(glc_snow_persistence_max_days,r8)*secspday
     glc_smb_include_snowpack = .true.
     call this%glcsmb%Init(bounds,nlfilename)
     call this%waterflux_inst%Init(bounds)
+    glc_snow_min_swe = h2osno_max - 1000.0_r8
+    call this%glcsmb%CheckNML()
     call this%glc_behavior%InitSetDirectly(bounds%begg, bounds%endg, &
          has_virtual_columns = grc_array(.false.), &
          collapse_to_atm_topo = grc_array(.true.))
@@ -204,39 +215,40 @@ contains
 
   @Test
   subroutine ComputeSurfaceMassBalanceNoRouteNoMeltNoPSnow_Test( this )
-    use clm_varcon , only: secspday
     class(TestGSMB), intent(inout) :: this
     real(r8), allocatable :: Freeze(:)
     real(r8), allocatable :: Melt(:)
     real(r8) :: iceamt
+    integer :: glc_incep
 
-    call this%glc2lnd_inst%update_glc2lnd_fracs( &
-               bounds = bounds )
+    ! Settings
     this%waterstate_inst%h2osoi_liq_col(:,:) = 0.0_r8
     this%waterstate_inst%h2osoi_ice_col(:,:) = 0.0_r8
-    call this%glcsmb%HandleIceMelt( bounds, this%numfALL, this%filterALL, &
-       this%waterstate_inst)
-    this%waterstate_inst%snow_persistence_col = real(glc_snow_persistence_max_days,r8)*secspday - real(dtime,r8)
     iceamt = 200.0_r8
     this%waterflux_inst%qflx_snwcp_ice_col = iceamt
     this%glc2lnd_inst%glc_dyn_runoff_routing_grc = 0.0_r8
-    call this%glcsmb%ComputeSurfaceMassBalance( bounds, this%numfALL, this%filterALL, &
-       this%numfALL, this%filterALL, this%glc2lnd_inst, this%waterstate_inst, &
-       this%waterflux_inst )
-    this%expected = 0.0_r8
-    @assertEqual( this%expected, this%glcsmb%qflx_glcice_dyn_water_flux_col )
-    call this%glcsmb%GetFreeze( bounds, Freeze )
-    call this%glcsmb%GetMelt( bounds, Melt )
-    this%expected(:) = iceamt
-    this%expected(bounds%endc) = 0.0_r8
-    @assertEqual( this%expected(:), Freeze(:) )
-    this%expected(:) = 0.0_r8
-    @assertEqual( this%expected(:), Melt(:) )
-    this%expected(:) = Freeze(:) - Melt(:)
-    @assertEqual( this%expected(:), this%glcsmb%qflx_glcice_col(:), tolerance=tol )
-    this%expected(:) = iceamt
-    this%expected(bounds%endc) = 0.0_r8
-    @assertEqual( this%expected(:), this%glcsmb%qflx_glcice_col(:), tolerance=tol )
+
+    do glc_incep = glc_incep_before, glc_incep_start
+       call this%persistance( glc_incep )
+       this%expected(:) = 0.0_r8
+       call this%RunSMBSequence( )
+
+       @assertEqual( this%expected, this%glcsmb%qflx_glcice_dyn_water_flux_col )
+
+       call this%glcsmb%GetFreeze( bounds, Freeze )
+       call this%glcsmb%GetMelt( bounds, Melt )
+       this%expected(:) = iceamt
+       if ( glc_incep == glc_incep_before ) this%expected(bounds%endc) = 0.0_r8
+       @assertEqual( this%expected(:), Freeze(:) )
+       this%expected(:) = 0.0_r8
+       @assertEqual( this%expected(:), Melt(:) )
+       this%expected(:) = Freeze(:) - Melt(:)
+       @assertEqual( this%expected(:), this%glcsmb%qflx_glcice_col(:), tolerance=tol )
+       this%expected(:) = iceamt
+       if ( glc_incep == glc_incep_before ) this%expected(bounds%endc) = 0.0_r8
+       @assertEqual( this%expected(:), this%glcsmb%qflx_glcice_col(:), tolerance=tol )
+    end do
+
     deallocate( Freeze )
     deallocate( Melt )
 
@@ -244,27 +256,22 @@ contains
 
   @Test
   subroutine ComputeSurfaceMassBalanceOneRouteNoMeltPSnow_Test( this )
-    use clm_varcon , only: secspday
     class(TestGSMB), intent(inout) :: this
     real(r8), allocatable :: Freeze(:)
     real(r8), allocatable :: Melt(:)
     real(r8) :: iceamt
 
-    call this%glc2lnd_inst%update_glc2lnd_fracs( &
-               bounds = bounds )
     this%waterstate_inst%h2osoi_liq_col(:,:) = 0.0_r8
     this%waterstate_inst%h2osoi_ice_col(:,:) = 0.0_r8
-    call this%glcsmb%HandleIceMelt( bounds, this%numfALL, this%filterALL, &
-       this%waterstate_inst)
-    this%waterstate_inst%snow_persistence_col = real(glc_snow_persistence_max_days,r8)*secspday
+    this%waterstate_inst%snow_persistence_col = this%persistence_longenough
     iceamt = 300.0_r8
     this%waterflux_inst%qflx_snwcp_ice_col = iceamt
     this%glc2lnd_inst%glc_dyn_runoff_routing_grc = 1.0_r8
-    call this%glcsmb%ComputeSurfaceMassBalance( bounds, this%numfALL, this%filterALL, &
-       this%numfALL, this%filterALL, this%glc2lnd_inst, this%waterstate_inst, &
-       this%waterflux_inst )
+
+    call this%RunSMBSequence( )
+
     call this%glcsmb%GetFreeze( bounds, Freeze )
-    this%expected = -Freeze
+    this%expected(:) = -Freeze
     @assertEqual( this%expected, this%glcsmb%qflx_glcice_dyn_water_flux_col )
     call this%glcsmb%GetMelt( bounds, Melt )
     this%expected(:) = iceamt
@@ -282,7 +289,6 @@ contains
 
   @Test
   subroutine ComputeSurfaceMassBalanceOneRouteMeltEqFreezePSnow_Test( this )
-    use clm_varcon , only: secspday
     class(TestGSMB), intent(inout) :: this
     real(r8), allocatable :: Freeze(:)
     real(r8), allocatable :: Melt(:)
@@ -290,20 +296,16 @@ contains
 
     ! Melt will equal freeze, except for non-glacier where melt==0 and freeze is normal
     iceamt = real(nlevgrnd,r8)/real(dtime,r8)
-    call this%glc2lnd_inst%update_glc2lnd_fracs( &
-               bounds = bounds )
     this%waterstate_inst%h2osoi_liq_col(:,:) = 1.0_r8
     this%waterstate_inst%h2osoi_ice_col(:,:) = 0.0_r8
-    call this%glcsmb%HandleIceMelt( bounds, this%numfALL, this%filterALL, &
-       this%waterstate_inst)
-    this%waterstate_inst%snow_persistence_col = real(glc_snow_persistence_max_days,r8)*secspday
+    this%waterstate_inst%snow_persistence_col = this%persistence_longenough
     this%waterflux_inst%qflx_snwcp_ice_col = iceamt
     this%glc2lnd_inst%glc_dyn_runoff_routing_grc = 1.0_r8
-    call this%glcsmb%ComputeSurfaceMassBalance( bounds, this%numfALL, this%filterALL, &
-       this%numfALL, this%filterALL, this%glc2lnd_inst, this%waterstate_inst, &
-       this%waterflux_inst )
+
+    call this%RunSMBSequence( )
+
     call this%glcsmb%GetFreeze( bounds, Freeze )
-    this%expected = 0.0_r8
+    this%expected(:) = 0.0_r8
     this%expected(bounds%endc) = -iceamt
     @assertEqual( this%expected, this%glcsmb%qflx_glcice_dyn_water_flux_col )
     call this%glcsmb%GetMelt( bounds, Melt )
@@ -322,7 +324,6 @@ contains
 
   @Test
   subroutine ComputeSurfaceMassBalanceOneRouteSnoIncrease_Test( this )
-    use clm_varcon , only: secspday
     class(TestGSMB), intent(inout) :: this
     real(r8), allocatable :: Freeze(:)
     real(r8), allocatable :: Melt(:)
@@ -330,21 +331,17 @@ contains
 
     ! Melt will equal freeze, except for non-glacier where melt==0 and freeze is normal
     iceamt = real(nlevgrnd,r8)/real(dtime,r8)
-    call this%glc2lnd_inst%update_glc2lnd_fracs( &
-               bounds = bounds )
     this%waterstate_inst%h2osoi_liq_col(:,:) = 1.0_r8/iceamt
     this%waterstate_inst%h2osoi_ice_col(:,:) = 0.0_r8
-    call this%glcsmb%HandleIceMelt( bounds, this%numfALL, this%filterALL, &
-       this%waterstate_inst)
-    this%waterstate_inst%snow_persistence_col = real(glc_snow_persistence_max_days,r8)*secspday
+    this%waterstate_inst%snow_persistence_col = this%persistence_longenough
     this%waterflux_inst%qflx_snwcp_ice_col = 0.0_r8
     this%glc2lnd_inst%glc_dyn_runoff_routing_grc = 1.0_r8
     this%waterstate_inst%h2osno_col(:) = this%waterstate_inst%h2osno_old_col(:) + real(dtime,r8)
-    call this%glcsmb%ComputeSurfaceMassBalance( bounds, this%numfALL, this%filterALL, &
-       this%numfALL, this%filterALL, this%glc2lnd_inst, this%waterstate_inst, &
-       this%waterflux_inst )
+
+    call this%RunSMBSequence( )
+
     call this%glcsmb%GetFreeze( bounds, Freeze )
-    this%expected = 0.0_r8
+    this%expected(:) = 0.0_r8
     this%expected(bounds%endc) = -1.0_r8
     @assertEqual( this%expected, this%glcsmb%qflx_glcice_dyn_water_flux_col, tolerance=tol )
     call this%glcsmb%GetMelt( bounds, Melt )
@@ -366,23 +363,17 @@ contains
     class(TestGSMB), intent(inout) :: this
     real(r8) :: iceamt
 
-    call this%glc2lnd_inst%update_glc2lnd_fracs( &
-               bounds = bounds )
     ! If no liquid in soil water, melt will be zero
     this%waterstate_inst%h2osoi_liq_col(:,:) = 0.0_r8
     this%waterstate_inst%h2osoi_ice_col(:,:) = 0.0_r8
-    call this%glcsmb%HandleIceMelt( bounds, this%numfALL, this%filterALL, &
-       this%waterstate_inst)
     this%waterflux_inst%qflx_snwcp_ice_col = 0.0_r8
-    call this%glcsmb%ComputeSurfaceMassBalance( bounds, this%numfALL, this%filterALL, &
-       this%numfALL, this%filterALL, this%glc2lnd_inst, this%waterstate_inst, &
-       this%waterflux_inst )
     iceamt = 250.0_r8
     this%qflx_qrgwl = iceamt
     this%glc2lnd_inst%glc_dyn_runoff_routing_grc = 0.0_r8
     this%qflx_ice_runoff_snwcp = iceamt
-    call this%glcsmb%AdjustRunoffTerms( bounds, this%numfALL, this%filterALL, &
-       this%glc2lnd_inst, this%qflx_qrgwl, this%qflx_ice_runoff_snwcp )
+
+    call this%RunSMBSequence( )
+
     this%expected(:) = iceamt
     @assertEqual( this%expected(:), this%qflx_qrgwl(:) )
     @assertEqual( this%expected(:), this%qflx_ice_runoff_snwcp(:) )
@@ -394,22 +385,16 @@ contains
     real(r8) :: iceamt
 
     iceamt = real(nlevgrnd,r8)/real(dtime,r8)
-    call this%glc2lnd_inst%update_glc2lnd_fracs( &
-               bounds = bounds )
     this%waterstate_inst%h2osoi_liq_col(:,:) = 1.0_r8
     this%waterstate_inst%h2osoi_ice_col(:,:) = 0.0_r8
-    call this%glcsmb%HandleIceMelt( bounds, this%numfALL, this%filterALL, &
-       this%waterstate_inst)
     this%waterflux_inst%qflx_snwcp_ice_col = iceamt
     this%glc2lnd_inst%glc_dyn_runoff_routing_grc = 1.0_r8
     this%waterstate_inst%snow_persistence_col = 0.0_r8
-    call this%glcsmb%ComputeSurfaceMassBalance( bounds, this%numfALL, this%filterALL, &
-       this%numfALL, this%filterALL, this%glc2lnd_inst, this%waterstate_inst, &
-       this%waterflux_inst )
     this%qflx_qrgwl = iceamt
     this%qflx_ice_runoff_snwcp = iceamt
-    call this%glcsmb%AdjustRunoffTerms( bounds, this%numfALL, this%filterALL, &
-       this%glc2lnd_inst, this%qflx_qrgwl, this%qflx_ice_runoff_snwcp )
+
+    call this%RunSMBSequence( )
+
     this%expected(:) = iceamt*2.0_r8
     this%expected(bounds%endc) = iceamt
     @assertEqual( this%expected(:), this%qflx_qrgwl(:) )
@@ -417,6 +402,35 @@ contains
     this%expected(bounds%endc) = iceamt
     @assertEqual( this%expected(:), this%qflx_ice_runoff_snwcp(:) )
   end subroutine AdjustRunoffTermsOneRouteMeltEqSnowcap_Test
+
+  subroutine RunSMBSequence( this )
+    class(TestGSMB), intent(inout) :: this
+
+    call this%glc2lnd_inst%update_glc2lnd_fracs( &
+               bounds = bounds )
+    call this%glcsmb%HandleIceMelt( bounds, this%numfALL, this%filterALL, &
+       this%waterstate_inst)
+    call this%glcsmb%ComputeSurfaceMassBalance( bounds, this%numfALL, this%filterALL, &
+       this%numfALL, this%filterALL, this%glc2lnd_inst, this%waterstate_inst, &
+       this%waterflux_inst )
+    call this%glcsmb%AdjustRunoffTerms( bounds, this%numfALL, this%filterALL, &
+       this%glc2lnd_inst, this%qflx_qrgwl, this%qflx_ice_runoff_snwcp )
+  end subroutine RunSMBSequence
+
+  subroutine persistance( this, glc_incep )
+    class(TestGSMB), intent(inout) :: this
+    integer, intent(in) :: glc_incep
+
+    if ( glc_incep == glc_incep_before )then
+      this%waterstate_inst%snow_persistence_col = this%persistence_tooshort
+      @assertEqual( glc_incep, 0,  message="glc_incep should be zero here" )
+    else if ( glc_incep == glc_incep_start )then
+      this%waterstate_inst%snow_persistence_col = this%persistence_longenough
+      @assertEqual( glc_incep, 1,  message="glc_incep should be one here" )
+    else
+      @assertTrue( .false., message="glc_incep can ONLY be 0 or 1" )
+    end if
+  end subroutine persistance
 
   @Test
   subroutine NegativeSnowFail_Test( this )
@@ -427,7 +441,7 @@ contains
     glc_snow_min_swe = -10.d00
     call this%glcsmb%CheckNML()
     expected_msg = endrun_msg( &
-         "ERROR glc_snow_min_swe is negative or zero and can not be" )
+         "ERROR glc_snow_min_swe is negative or less than zero and can not be" )
     @assertExceptionRaised(expected_msg)
   end subroutine NegativeSnowFail_Test
 
@@ -471,5 +485,41 @@ contains
          "ERROR glc_snow_persistence_max_days is negative and can not be" )
     @assertExceptionRaised(expected_msg)
   end subroutine NegativeSnowPersistFail_Test
+
+   @Test
+   subroutine GlacialInceptionTrigger_Test( this )
+     use landunit_varcon, only : istsoil
+     use LandunitType   , only : lun
+     use ColumnType     , only : col
+     class(TestGSMB), intent(inout) :: this
+     integer :: c, l
+ 
+     ! Only check the vegetated column the last landunit
+     l = bounds%endl
+     c = lun%coli(l)
+     @assertEqual( c, bounds%endc, message="First column on landunit is also the last" )
+     @assertEqual( lun%itype(l), istsoil, message="Second landunit is soil" )
+     ! Set persistance to before inception
+     call this%persistance( glc_incep=glc_incep_before )
+     ! Snow depth shouldn't matter
+     this%waterstate_inst%h2osno_col(:) = glc_snow_min_swe + 1.0_r8
+     @assertFalse( this%glcsmb%GlacialInceptionTrigger( this%waterstate_inst, c=c), message="before persist" )
+     this%waterstate_inst%h2osno_col(:) = glc_snow_min_swe - 1.0_r8
+     @assertFalse( this%glcsmb%GlacialInceptionTrigger( this%waterstate_inst, c=c), message="before persist less snow" )
+     ! Set persistance to after inception
+     call this%persistance( glc_incep=glc_incep_start )
+     ! Now snow depth matters
+     this%waterstate_inst%h2osno_col(:) = glc_snow_min_swe + 1.0_r8
+     @assertTrue( this%glcsmb%GlacialInceptionTrigger( this%waterstate_inst, c=c), message="after persist more snow" )
+     this%waterstate_inst%h2osno_col(:) = glc_snow_min_swe
+     @assertTrue( this%glcsmb%GlacialInceptionTrigger( this%waterstate_inst, c=c), message="after persist at min snow" )
+     this%waterstate_inst%h2osno_col(:) = glc_snow_min_swe - 1.0_r8
+     @assertFalse( this%glcsmb%GlacialInceptionTrigger( this%waterstate_inst, c=c), message="after persist at less snow" )
+     ! if min swe is zero, snow depth won't matter
+     glc_snow_min_swe = 0.0_r8
+     this%waterstate_inst%h2osno_col(:) = 0.0_r8
+     @assertTrue( this%glcsmb%GlacialInceptionTrigger( this%waterstate_inst, c=c), message="after persist no snow and zero min snow" )
+ 
+   end subroutine GlacialInceptionTrigger_Test
 
 end module test_glacier_surface_mass_balance
