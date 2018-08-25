@@ -436,16 +436,52 @@ contains
   end subroutine persistance
 
   @Test
-  subroutine NegativeSnowFail_Test( this )
+  subroutine includeSnowPackFail_test( this )
+    use clm_varcon                    , only : h2osno_max
     class(TestGSMB), intent(inout) :: this
 
     character(len=256) :: expected_msg
 
-    glc_snow_min_swe = -10.d00
+    glc_smb_include_snowpack = .true.
+    glc_snow_min_swe = h2osno_max
     call this%glcsmb%CheckNML()
     expected_msg = endrun_msg( &
-         "ERROR glc_snow_min_swe is negative or less than zero and can not be" )
+         "ERROR setting glc_smb_include_snowpack true only makes sense when glc_snow_min_swe is less than h2osno_max" )
     @assertExceptionRaised(expected_msg)
+  end subroutine includeSnowPackFail_test
+
+  @Test
+  subroutine includeNoSnowPackFail_test( this )
+    use clm_varcon                    , only : h2osno_max
+    class(TestGSMB), intent(inout) :: this
+
+    character(len=256) :: expected_msg
+
+    glc_smb_include_snowpack = .false.
+    glc_snow_min_swe = h2osno_max*0.5
+    call this%glcsmb%CheckNML()
+    expected_msg = endrun_msg( &
+         "ERROR when setting glc_smb_include_snowpack false setting glc_snow_min_swe does NOT make sense and has no effect" )
+    @assertExceptionRaised(expected_msg)
+  end subroutine includeNoSnowPackFail_test
+
+  @Test
+  subroutine NegativeSnowFail_Test( this )
+    class(TestGSMB), intent(inout) :: this
+
+    character(len=256) :: expected_msg
+    integer :: i
+
+    ! Do both settings of logical to include snowpack, shouldn't matter
+    glc_smb_include_snowpack = .true.
+    do i = 1, 2
+       glc_snow_min_swe = -10.d00
+       call this%glcsmb%CheckNML()
+       expected_msg = endrun_msg( &
+            "ERROR glc_snow_min_swe is negative or less than zero and can not be" )
+       @assertExceptionRaised(expected_msg)
+       glc_smb_include_snowpack = .false.
+    end do
   end subroutine NegativeSnowFail_Test
 
   @Test
@@ -454,12 +490,18 @@ contains
     class(TestGSMB), intent(inout) :: this
 
     character(len=256) :: expected_msg
+    integer :: i
 
-    glc_snow_min_swe = h2osno_max + 1
-    call this%glcsmb%CheckNML()
-    expected_msg = endrun_msg( &
-         "ERROR glc_snow_min_swe is greater than h2osno_max and can not be" )
-    @assertExceptionRaised(expected_msg)
+    ! Do both settings of logical to include snowpack, shouldn't matter
+    glc_smb_include_snowpack = .true.
+    do i = 1, 2
+       glc_snow_min_swe = h2osno_max + 1
+       call this%glcsmb%CheckNML()
+       expected_msg = endrun_msg( &
+            "ERROR glc_snow_min_swe is greater than h2osno_max and can not be" )
+       @assertExceptionRaised(expected_msg)
+       glc_smb_include_snowpack = .false.
+    end do
   end subroutine TooLargeSnowFail_Test
 
   @Test
@@ -468,12 +510,18 @@ contains
     class(TestGSMB), intent(inout) :: this
 
     character(len=256) :: expected_msg
+    integer :: i
 
-    h2osno_max = -999.0_r8
-    call this%glcsmb%CheckNML()
-    expected_msg = endrun_msg( &
-         "ERROR h2osno_max MUST be set before glacier_smb_type Init" )
-    @assertExceptionRaised(expected_msg)
+    ! Do both settings of logical to include snowpack, shouldn't matter
+    glc_smb_include_snowpack = .true.
+    do i = 1, 2
+       h2osno_max = -999.0_r8
+       call this%glcsmb%CheckNML()
+       expected_msg = endrun_msg( &
+            "ERROR h2osno_max MUST be set before glacier_smb_type Init" )
+       @assertExceptionRaised(expected_msg)
+       glc_smb_include_snowpack = .false.
+    end do
   end subroutine h2osnomaxnotsetFail_Test
 
   @Test
@@ -481,12 +529,18 @@ contains
     class(TestGSMB), intent(inout) :: this
 
     character(len=256) :: expected_msg
+    integer :: i
 
-    glc_snow_persistence_max_days = -1
-    call this%glcsmb%CheckNML()
-    expected_msg = endrun_msg( &
-         "ERROR glc_snow_persistence_max_days is negative and can not be" )
-    @assertExceptionRaised(expected_msg)
+    ! Do both settings of logical to include snowpack, shouldn't matter
+    glc_smb_include_snowpack = .true.
+    do i = 1, 2
+       glc_snow_persistence_max_days = -1
+       call this%glcsmb%CheckNML()
+       expected_msg = endrun_msg( &
+            "ERROR glc_snow_persistence_max_days is negative and can not be" )
+       @assertExceptionRaised(expected_msg)
+       glc_smb_include_snowpack = .false.
+    end do
   end subroutine NegativeSnowPersistFail_Test
 
    @Test
