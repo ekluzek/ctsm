@@ -169,12 +169,27 @@ contains
     end if
     if ( glc_snow_persistence_max_days < 0 )then
        call endrun(msg="ERROR glc_snow_persistence_max_days is negative and can not be")
+       return
     end if
     if ( glc_snow_min_swe < 0.0_r8 )then
        call endrun(msg="ERROR glc_snow_min_swe is negative or less than zero and can not be")
+       return
     end if
     if ( glc_snow_min_swe > h2osno_max )then
        call endrun(msg="ERROR glc_snow_min_swe is greater than h2osno_max and can not be")
+       return
+    end if
+
+    if ( glc_smb_include_snowpack )then
+       if ( .not. glc_snow_min_swe < h2osno_max )then
+          call endrun(msg="ERROR setting glc_smb_include_snowpack true only makes sense when glc_snow_min_swe is less than h2osno_max")
+          return
+       end if
+    else
+       if ( (glc_snow_min_swe /= h2osno_max) .and. (glc_snow_min_swe /= 0.0_r8) )then
+          call endrun(msg="ERROR when setting glc_smb_include_snowpack false setting glc_snow_min_swe does NOT make sense and has no effect")
+          return
+       end if
     end if
 
     if (masterproc) then
