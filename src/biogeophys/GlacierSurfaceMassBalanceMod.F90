@@ -8,17 +8,17 @@ module GlacierSurfaceMassBalanceMod
 #include "shr_assert.h"
   use shr_kind_mod   , only : r8 => shr_kind_r8
   use shr_log_mod    , only : errMsg => shr_log_errMsg
-  use shr_infnan_mod , only : nan => shr_infnan_nan, assignment(=)
   use decompMod      , only : bounds_type
-  use clm_varcon     , only : spval, secspday, h2osno_max
+  use clm_varcon     , only : secspday, h2osno_max
   use clm_varpar     , only : nlevgrnd
   use clm_time_manager, only : get_step_size
   use landunit_varcon, only : istice_mec
   use ColumnType     , only : col                
   use LandunitType   , only : lun
   use glc2lndMod     , only : glc2lnd_type
-  use WaterstateType , only : waterstate_type
-  use WaterfluxType  , only : waterflux_type
+  use WaterStateBulkType , only : waterstatebulk_type
+  use WaterBalanceType , only : waterbalance_type
+  use WaterFluxBulkType  , only : waterfluxbulk_type
   use abortutils     , only : endrun
 
   ! !PUBLIC TYPES:
@@ -28,21 +28,6 @@ module GlacierSurfaceMassBalanceMod
 
   type, public :: glacier_smb_type
      private
-
-     ! ------------------------------------------------------------------------
-     ! Public data
-     ! ------------------------------------------------------------------------
-
-     real(r8), pointer, public :: qflx_glcice_col(:) ! col net flux of new glacial ice (growth - melt) (mm H2O/s), passed to GLC; only valid inside the do_smb_c filter
-     real(r8), pointer, public :: qflx_glcice_dyn_water_flux_col(:) ! col water flux needed for balance check due to glc_dyn_runoff_routing (mm H2O/s) (positive means addition of water to the system); valid for all columns
-
-     ! ------------------------------------------------------------------------
-     ! Private data
-     ! ------------------------------------------------------------------------
-
-     real(r8), pointer :: qflx_glcice_frz_col (:)   ! col ice growth (positive definite) (mm H2O/s); only valid inside the do_smb_c filter
-     real(r8), pointer :: qflx_glcice_melt_col(:)   ! col ice melt (positive definite) (mm H2O/s); only valid inside the do_smb_c filter
-
 
    contains
 
@@ -63,16 +48,11 @@ module GlacierSurfaceMassBalanceMod
      ! Public routines for unit testing
      ! ------------------------------------------------------------------------
      procedure, public :: GlacialInceptionTrigger ! Logical function to flag if this column should now be treated as glacier
-     procedure, public :: GetFreeze               ! Return qflx_glcice_frz
-     procedure, public :: GetMelt                 ! Return qflx_glcice_melt_col
      procedure, public :: CheckNML                ! Check namelist settings
      ! ------------------------------------------------------------------------
      ! Private routines
      ! ------------------------------------------------------------------------
 
-     procedure, private :: InitAllocate
-     procedure, private :: InitHistory
-     procedure, private :: InitCold
      procedure, private :: InitReadNML
      procedure, private :: InitNML
 
@@ -104,10 +84,6 @@ contains
     character(len=*),  intent(in) :: NLFilename
     !-----------------------------------------------------------------------
 
-    call this%InitAllocate(bounds)
-    call this%InitHistory(bounds)
-    call this%InitCold(bounds)
-
     call this%InitNML()
     if ( len_trim(NLFilename) > 0 )then
        call this%InitReadNML( NLFilename )
@@ -116,73 +92,12 @@ contains
   end subroutine Init
 
   !-----------------------------------------------------------------------
-  subroutine InitAllocate(this, bounds)
+  subroutine Clean(this)
     class(glacier_smb_type), intent(inout) :: this
-    type(bounds_type), intent(in) :: bounds
-
-    integer :: begc, endc
     !-----------------------------------------------------------------------
 
-    begc = bounds%begc; endc = bounds%endc
-
-    allocate(this%qflx_glcice_col               (begc:endc)) ; this%qflx_glcice_col                (:) = nan
-    allocate(this%qflx_glcice_dyn_water_flux_col(begc:endc)) ; this%qflx_glcice_dyn_water_flux_col (:) = nan
-    allocate(this%qflx_glcice_frz_col           (begc:endc)) ; this%qflx_glcice_frz_col            (:) = nan
-    allocate(this%qflx_glcice_melt_col          (begc:endc)) ; this%qflx_glcice_melt_col           (:) = nan
-  end subroutine InitAllocate
-
-  !-----------------------------------------------------------------------
-  subroutine InitHistory(this, bounds)
-    !
-    ! !USES:
-    use histFileMod , only : hist_addfld1d
-    !
-    ! !ARGUMENTS:
-    class(glacier_smb_type), intent(inout) :: this
-    type(bounds_type), intent(in) :: bounds
-    !
-    ! !LOCAL VARIABLES:
-    integer :: begc, endc
-    !-----------------------------------------------------------------------
-
-    begc = bounds%begc; endc = bounds%endc
-
-    this%qflx_glcice_col(begc:endc) = spval
-    call hist_addfld1d (fname='QICE',  units='mm/s',  &
-         avgflag='A', long_name='ice growth/melt', &
-         ptr_col=this%qflx_glcice_col, l2g_scale_type='ice')
-
-    this%qflx_glcice_frz_col(begc:endc) = spval
-    call hist_addfld1d (fname='QICE_FRZ',  units='mm/s',  &
-         avgflag='A', long_name='ice growth', &
-         ptr_col=this%qflx_glcice_frz_col, l2g_scale_type='ice')
-
-    this%qflx_glcice_melt_col(begc:endc) = spval
-    call hist_addfld1d (fname='QICE_MELT',  units='mm/s',  &
-         avgflag='A', long_name='ice melt', &
-         ptr_col=this%qflx_glcice_melt_col, l2g_scale_type='ice')
-
-  end subroutine InitHistory
-
-  !-----------------------------------------------------------------------
-  subroutine InitCold(this, bounds)
-    class(glacier_smb_type), intent(inout) :: this
-    type(bounds_type), intent(in) :: bounds
-
-    integer :: c
-    !-----------------------------------------------------------------------
-
-    ! Initialize qflx_glcice_dyn_water_flux_col to 0 for all columns because we want this
-    ! flux to remain 0 for columns where is is never set, including non-glacier columns.
-    !
-    ! Other fluxes intentionally remain unset (spval) outside the do_smb filter, so that
-    ! they are flagged as missing value outside that filter.
-    do c = bounds%begc, bounds%endc
-       this%qflx_glcice_dyn_water_flux_col(c) = 0._r8
-    end do
-
-  end subroutine InitCold
-
+    call this%InitNML()
+  end subroutine Clean
 
   !-----------------------------------------------------------------------
   subroutine InitNML(this)
@@ -272,19 +187,19 @@ contains
   end subroutine CheckNML
 
   !-----------------------------------------------------------------------
-  logical function GlacialInceptionTrigger( this, waterstate_inst, c )
+  logical function GlacialInceptionTrigger( this, waterstatebulk_inst, c )
     ! Return true for a column that should now be treated as glacier
     ! Glacial inception requires both snow persistence to be greater than desired input value and 
     ! snow water equiv. to be greater than desired input value
     ! !USES:
     implicit none
-    class(glacier_smb_type), intent(inout) :: this             ! Glacier Surface Mass Balance instance
-    type(waterstate_type)  , intent(in)    :: waterstate_inst  ! Waterstate instance
-    integer                , intent(in)    :: c                ! Column to test
+    class(glacier_smb_type)  , intent(inout) :: this                 ! Glacier Surface Mass Balance instance
+    type(waterstatebulk_type), intent(in)    :: waterstatebulk_inst  ! Waterstate instance
+    integer                  , intent(in)    :: c                    ! Column to test
 
     ! In the following, we convert glc_snow_persistence_max_days to r8 to avoid overflow
-    if ( (waterstate_inst%snow_persistence_col(c) >= (real(glc_snow_persistence_max_days, r8) * secspday) ) .and. &
-         (waterstate_inst%h2osno_col(c) >= glc_snow_min_swe) ) then
+    if ( (waterstatebulk_inst%snow_persistence_col(c) >= (real(glc_snow_persistence_max_days, r8) * secspday) ) .and. &
+         (waterstatebulk_inst%h2osno_col(c) >= glc_snow_min_swe) ) then
          GlacialInceptionTrigger = .true.
     else
          GlacialInceptionTrigger = .false.
@@ -292,47 +207,13 @@ contains
 
   end function GlacialInceptionTrigger
 
-  !-----------------------------------------------------------------------
-  subroutine Clean(this)
-    class(glacier_smb_type), intent(inout) :: this
-
-    !-----------------------------------------------------------------------
-
-    deallocate(this%qflx_glcice_col               )
-    deallocate(this%qflx_glcice_dyn_water_flux_col)
-    deallocate(this%qflx_glcice_frz_col )
-    deallocate(this%qflx_glcice_melt_col)
-  end subroutine Clean
-
-  !-----------------------------------------------------------------------
-  subroutine GetFreeze( this, bounds, Freeze )
-    class(glacier_smb_type), intent(inout) :: this
-    type(bounds_type), intent(in) :: bounds
-    real(r8), allocatable, intent(out) :: Freeze(:)
-    !-----------------------------------------------------------------------
-    allocate(Freeze(bounds%begc:bounds%endc))
-    Freeze(:) = this%qflx_glcice_frz_col(:)
-
-  end subroutine GetFreeze
-
-  !-----------------------------------------------------------------------
-  subroutine GetMelt( this, bounds, Melt )
-    class(glacier_smb_type), intent(inout) :: this
-    type(bounds_type), intent(in) :: bounds
-    real(r8), allocatable, intent(out) :: Melt(:)
-    !-----------------------------------------------------------------------
-    allocate(Melt(bounds%begc:bounds%endc))
-    Melt(:) = this%qflx_glcice_melt_col(:)
-
-  end subroutine GetMelt
-
   ! ========================================================================
   ! Science routines
   ! ========================================================================
 
   !-----------------------------------------------------------------------
   subroutine HandleIceMelt(this, bounds, num_do_smb_c, filter_do_smb_c, &
-       waterstate_inst)
+       waterstatebulk_inst, waterfluxbulk_inst)
     !
     ! !DESCRIPTION:
     ! Compute ice melt in glacier columns, and convert liquid back to ice
@@ -355,11 +236,12 @@ contains
     ! may be best to keep this separate.
     !
     ! !ARGUMENTS:
-    class(glacier_smb_type), intent(inout) :: this
+    class(glacier_smb_type), intent(in) :: this
     type(bounds_type), intent(in) :: bounds
     integer, intent(in) :: num_do_smb_c        ! number of column points in filter_do_smb_c
     integer, intent(in) :: filter_do_smb_c(:)  ! column filter for points where SMB is calculated
-    type(waterstate_type), intent(inout) :: waterstate_inst
+    type(waterstatebulk_type), intent(inout) :: waterstatebulk_inst
+    type(waterfluxbulk_type), intent(inout) :: waterfluxbulk_inst
     !
     ! !LOCAL VARIABLES:
     integer :: j
@@ -370,9 +252,9 @@ contains
     !-----------------------------------------------------------------------
 
     associate( &
-         qflx_glcice_melt => this%qflx_glcice_melt_col , & ! Output: [real(r8) (:)   ] ice melt (positive definite) (mm H2O/s)
-         h2osoi_liq       => waterstate_inst%h2osoi_liq_col      , & ! Output: [real(r8) (:,:) ] liquid water (kg/m2)
-         h2osoi_ice       => waterstate_inst%h2osoi_ice_col        & ! Output: [real(r8) (:,:) ] ice lens (kg/m2)
+         h2osoi_liq       => waterstatebulk_inst%h2osoi_liq_col      , & ! Output: [real(r8) (:,:) ] liquid water (kg/m2)
+         h2osoi_ice       => waterstatebulk_inst%h2osoi_ice_col      , & ! Output: [real(r8) (:,:) ] ice lens (kg/m2)
+         qflx_glcice_melt => waterfluxbulk_inst%qflx_glcice_melt_col       & ! Output: [real(r8) (:)   ] ice melt (positive definite) (mm H2O/s)
          )
 
     dtime = get_step_size()
@@ -409,15 +291,15 @@ contains
 
   !-----------------------------------------------------------------------
   subroutine ComputeSurfaceMassBalance(this, bounds, num_allc, filter_allc, &
-       num_do_smb_c, filter_do_smb_c, glc2lnd_inst, waterstate_inst, waterflux_inst)
+       num_do_smb_c, filter_do_smb_c, glc2lnd_inst, waterstatebulk_inst,    &
+       waterbalance_inst, waterfluxbulk_inst)
     !
     ! !DESCRIPTION:
     ! Compute glacier fluxes other than ice melt.
     !
-    ! This sets the public fields qflx_glcice_col and qflx_glcice_dyn_water_flux_col to
-    ! their final values.
+    ! This sets qflx_glcice_col and qflx_glcice_dyn_water_flux_col.
     !
-    ! Should be called after HandleIceMelt, and after waterflux_inst%qflx_snwcp_ice_col is
+    ! Should be called after HandleIceMelt, and after waterfluxbulk_inst%qflx_snwcp_ice_col is
     ! computed
     !
     ! !ARGUMENTS:
@@ -428,8 +310,9 @@ contains
     integer, intent(in) :: num_do_smb_c        ! number of column points in filter_do_smb_c
     integer, intent(in) :: filter_do_smb_c(:)  ! column filter for points where SMB is calculated
     type(glc2lnd_type), intent(in) :: glc2lnd_inst
-    type(waterstate_type), intent(in) :: waterstate_inst
-    type(waterflux_type), intent(in) :: waterflux_inst
+    type(waterstatebulk_type), intent(in) :: waterstatebulk_inst
+    type(waterbalance_type), intent(in) :: waterbalance_inst
+    type(waterfluxbulk_type), intent(inout) :: waterfluxbulk_inst
     !
     ! !LOCAL VARIABLES:
     integer :: fc, c, l, g
@@ -439,15 +322,15 @@ contains
     !-----------------------------------------------------------------------
 
     associate( &
-         qflx_glcice                => this%qflx_glcice_col                    , & ! Output: [real(r8) (:)] net flux of new glacial ice (growth - melt) (mm H2O/s)
-         qflx_glcice_frz            => this%qflx_glcice_frz_col                , & ! Output: [real(r8) (:)] ice growth (positive definite) (mm H2O/s)
-         qflx_glcice_dyn_water_flux => this%qflx_glcice_dyn_water_flux_col     , & ! Output: [real(r8) (:)] water flux needed for balance check due to glc_dyn_runoff_routing (mm H2O/s) (positive means addition of water to the system)
-         qflx_glcice_melt           => this%qflx_glcice_melt_col               , & ! Input: [real(r8) (:)] ice melt (positive definite) (mm H2O/s)
          glc_dyn_runoff_routing     => glc2lnd_inst%glc_dyn_runoff_routing_grc , & ! Input:  [real(r8) (:)]  whether we're doing runoff routing appropriate for having a dynamic icesheet
-         snow_persistence           => waterstate_inst%snow_persistence_col    , & ! Input: [real(r8) (:)]  counter for length of time snow-covered
-         h2osno                     => waterstate_inst%h2osno_col              , & ! Input: [real(r8) (:)] col snow water (mm H2O)
-         h2osno_old                 => waterstate_inst%h2osno_old_col          , & ! Input: [real(r8) (:)] col snow mass for previous time step (kg/m2)
-         qflx_snwcp_ice             => waterflux_inst%qflx_snwcp_ice_col         & ! Input: [real(r8) (:)]  excess solid h2o due to snow capping (outgoing) (mm H2O /s) [+]
+         snow_persistence           => waterstatebulk_inst%snow_persistence_col    , & ! Input: [real(r8) (:)]  counter for length of time snow-covered
+         h2osno                     => waterstatebulk_inst%h2osno_col              , & ! Input: [real(r8) (:)] col snow water (mm H2O)
+         h2osno_old                 => waterbalance_inst%h2osno_old_col            , & ! Input: [real(r8) (:)] col snow mass for previous time step (kg/m2)
+         qflx_snwcp_ice             => waterfluxbulk_inst%qflx_snwcp_ice_col       , & ! Input: [real(r8) (:)]  excess solid h2o due to snow capping (outgoing) (mm H2O /s) [+]
+         qflx_glcice_melt           => waterfluxbulk_inst%qflx_glcice_melt_col     , & ! Input: [real(r8) (:)] ice melt (positive definite) (mm H2O/s)
+         qflx_glcice                => waterfluxbulk_inst%qflx_glcice_col          , & ! Output: [real(r8) (:)] net flux of new glacial ice (growth - melt) (mm H2O/s)
+         qflx_glcice_frz            => waterfluxbulk_inst%qflx_glcice_frz_col      , & ! Output: [real(r8) (:)] ice growth (positive definite) (mm H2O/s)
+         qflx_glcice_dyn_water_flux => waterfluxbulk_inst%qflx_glcice_dyn_water_flux_col & ! Output: [real(r8) (:)] water flux needed for balance check due to glc_dyn_runoff_routing (mm H2O/s) (positive means addition of water to the system)
          )
     dtime = get_step_size()
 
@@ -472,7 +355,7 @@ contains
        c = filter_do_smb_c(fc)
        l = col%landunit(c)
        g = col%gridcell(c)
-       if ( this%GlacialInceptionTrigger( waterstate_inst, c ) .or. lun%itype(l) == istice_mec) then
+       if ( this%GlacialInceptionTrigger( waterstatebulk_inst, c ) .or. lun%itype(l) == istice_mec) then
           qflx_glcice_frz(c) = qflx_snwcp_ice(c)
           ! If SMB for glaciers include snowpack...
           if ( glc_smb_include_snowpack )then
@@ -517,7 +400,7 @@ contains
 
   !-----------------------------------------------------------------------
   subroutine AdjustRunoffTerms(this, bounds, num_do_smb_c, filter_do_smb_c, &
-       glc2lnd_inst, qflx_qrgwl, qflx_ice_runoff_snwcp)
+       waterfluxbulk_inst, glc2lnd_inst, qflx_qrgwl, qflx_ice_runoff_snwcp)
     !
     ! !DESCRIPTION:
     ! Adjust liquid and ice runoff fluxes due to glacier fluxes
@@ -532,6 +415,7 @@ contains
     type(bounds_type), intent(in) :: bounds
     integer, intent(in) :: num_do_smb_c        ! number of column points in filter_do_smb_c
     integer, intent(in) :: filter_do_smb_c(:)  ! column filter for points where SMB is calculated
+    type(waterfluxbulk_type), intent(in) :: waterfluxbulk_inst
     type(glc2lnd_type), intent(in) :: glc2lnd_inst
     real(r8), intent(inout) :: qflx_qrgwl( bounds%begc: ) ! col qflx_surf at glaciers, wetlands, lakes
     real(r8), intent(inout) :: qflx_ice_runoff_snwcp( bounds%begc: ) ! col solid runoff from snow capping (mm H2O /s)
@@ -546,8 +430,8 @@ contains
     SHR_ASSERT_ALL((ubound(qflx_ice_runoff_snwcp) == (/bounds%endc/)), errMsg(sourcefile, __LINE__))
 
     associate( &
-         qflx_glcice_frz        => this%qflx_glcice_frz_col                   , & ! Input: [real(r8) (:)] ice growth (positive definite) (mm H2O/s)
-         qflx_glcice_melt       => this%qflx_glcice_melt_col                  , & ! Input: [real(r8) (:)] ice melt (positive definite) (mm H2O/s)
+         qflx_glcice_frz        => waterfluxbulk_inst%qflx_glcice_frz_col         , & ! Input: [real(r8) (:)] ice growth (positive definite) (mm H2O/s)
+         qflx_glcice_melt       => waterfluxbulk_inst%qflx_glcice_melt_col        , & ! Input: [real(r8) (:)] ice melt (positive definite) (mm H2O/s)
          glc_dyn_runoff_routing =>    glc2lnd_inst%glc_dyn_runoff_routing_grc   & ! Input: [real(r8) (:)]  gridcell fraction coupled to dynamic ice sheet
          )
 
