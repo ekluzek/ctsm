@@ -1,0 +1,29 @@
+# CLM-CISM
+
+### domain files
+./xmlchange --id ATM_DOMAIN_PATH --val "/gpfs/fs1/work/sbradley/CESM2.0_SETUP/CPL/DOMAIN/"
+./xmlchange --id LND_DOMAIN_PATH --val "/gpfs/fs1/work/sbradley/CESM2.0_SETUP/CPL/DOMAIN/"
+./xmlchange --id OCN_DOMAIN_PATH --val "/gpfs/fs1/work/sbradley/CESM2.0_SETUP/CPL/DOMAIN/"
+./xmlchange --id ICE_DOMAIN_PATH --val "/gpfs/fs1/work/sbradley/CESM2.0_SETUP/CPL/DOMAIN/"
+./xmlchange --id ATM_DOMAIN_FILE --val "domain.lnd.fv0.9x1.25_gx1v7.190426.nc"
+./xmlchange --id LND_DOMAIN_FILE --val "domain.lnd.fv0.9x1.25_gx1v7.190426.nc" 
+./xmlchange --id OCN_DOMAIN_FILE --val "domain.ocn.gx1v7.190426.nc"
+./xmlchange --id ICE_DOMAIN_FILE --val "domain.ocn.gx1v7.190426.nc"
+
+# CLM-CISM (1deg to 4km)
+./xmlchange --id LND2GLC_FMAPNAME --val "/gpfs/fs1/work/sbradley/CESM2.0_SETUP/CPL/CLM-CISM/map_fv0.9x1.25_TO_4km_aave.190515.nc"
+./xmlchange --id LND2GLC_SMAPNAME --val "/gpfs/fs1/work/sbradley/CESM2.0_SETUP/CPL/CLM-CISM/map_fv0.9x1.25_TO_4km_blin.190515.nc"
+./xmlchange --id  GLC2LND_FMAPNAME --val "/gpfs/fs1/work/sbradley/CESM2.0_SETUP/CPL/CLM-CISM/map_4km_TO_fv0.9x1.25_aave.190515.nc"
+./xmlchange --id GLC2LND_SMAPNAME --val  "/gpfs/fs1/work/sbradley/CESM2.0_SETUP/CPL/CLM-CISM/map_4km_TO_fv0.9x1.25_aave.190515.nc"
+
+
+# RTM-OCN (0.5deg to gx1v7)
+./xmlchange --id ROF2OCN_LIQ_RMAPNAME --val  "/gpfs/fs1/work/sbradley/CESM2.0_SETUP/CPL/RTM-OCN/RMAP/map_r0.5_gx1v7_190426.liq.rmap.nc"
+./xmlchange --id ROF2OCN_ICE_RMAPNAME --val  "/gpfs/fs1/work/sbradley/CESM2.0_SETUP/CPL/RTM-OCN/RMAP/map_r0.5_to_gx1v7_190426.ice.rmap.nc"
+./xmlchange --id ROF2OCN_FMAPNAME --val  "/gpfs/fs1/work/sbradley/CESM2.0_SETUP/CPL/RTM-OCN/FMAP/map_r05deg_TO_gx1v7-21ka_aave.fmap.190427.nc"
+
+# RTM-CLM: (0.5deg to 1deg)
+
+
+./xmlchange --id LND2ROF_FMAPNAME --val  "/gpfs/fs1/work/sbradley/CESM2.0_SETUP/CPL/RTM-CLM/map_fv0.9x1.25_TO_0.5_aave.190321.nc"
+./xmlchange --id ROF2LND_FMAPNAME --val  "/gpfs/fs1/work/sbradley/CESM2.0_SETUP/CPL/RTM-CLM/map_0.5_TO_fv0.9x1.25_aave.190321.nc"
