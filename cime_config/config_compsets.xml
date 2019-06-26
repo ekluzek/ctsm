@@ -178,6 +178,11 @@
    </compset>
 
   <compset>
+     <alias>I1850Clm50BgcNoAnthroG</alias>
+     <lname>1850_DATM%GSWP3v1_CLM50%BGC-NOANTHRO_SICE_SOCN_RTM_CISM2%EVOLVE_SWAV</lname>
+   </compset>
+
+  <compset>
      <alias>I1850Clm50SpNoAnthro</alias>
      <lname>1850_DATM%GSWP3v1_CLM50%SP-NOANTHRO_SICE_SOCN_MOSART_CISM2%NOEVOLVE_SWAV</lname>
    </compset>
