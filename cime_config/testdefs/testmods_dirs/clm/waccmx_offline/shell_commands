@@ -1,2 +1,6 @@
 ./xmlchange USE_ESMF_LIB=TRUE,ATM_NCPL=288,CALENDAR=GREGORIAN
+./xmlchange CLM_BLDNML_OPTS="-no-fire_emis -megan -drydep" --append
+./xmlchange LND_TUNING_MODE=clm5_0_cam6.0
+./xmlchange ROF_NCPL=\$ATM_NCPL
+./xmlchange GLC_NCPL=\$ATM_NCPL
 
