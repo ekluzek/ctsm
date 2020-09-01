@@ -99,7 +99,7 @@ EOF
   }
   if ( ($lon < $dx/2.0)   || ($lon > 360.0-$dx/2.0) ) {
      die <<"EOF";
-** $ProgName - Bad value for longitude  (=$lat) for $desc **
+** $ProgName - Bad value for longitude  (=$lon) for $desc **
 EOF
   }
   return( $lat, $lon );
