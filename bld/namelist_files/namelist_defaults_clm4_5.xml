@@ -2696,6 +2696,13 @@ lnd/clm2/surfdata_map/release-clm5.0.30/surfdata_0.9x1.25_SSP5-3.4_78pfts_CMIP6_
 <fates_parteh_mode             use_fates=".true.">1</fates_parteh_mode>
 
 <!-- =========================================  -->
+<!-- Defaults for dynamic subgrid               -->
+<!-- (some other defaults for dynamic subgrid   -->
+<!-- are set in the BuildNamelist code)         -->
+<!-- =========================================  -->
+<reset_dynbal_baselines>.false.</reset_dynbal_baselines>
+
+<!-- =========================================  -->
 <!-- Defaults for init_interp                   -->
 <!-- =========================================  -->
 
