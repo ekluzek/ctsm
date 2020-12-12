@@ -70,6 +70,7 @@ contains
     @assertFalse(glc_behavior%has_virtual_columns_grc(bounds%begg))
     @assertFalse(glc_behavior%get_collapse_to_atm_topo(bounds%begg))
     @assertTrue(glc_behavior%allow_multiple_columns_grc(bounds%begg))
+    @assertTrue(glc_behavior%runoff_prescribed_grc(bounds%begg))
   end subroutine init_multiple_behaviorIsCorrect
 
   @Test
@@ -91,6 +92,7 @@ contains
     @assertTrue(glc_behavior%has_virtual_columns_grc(bounds%begg))
     @assertFalse(glc_behavior%get_collapse_to_atm_topo(bounds%begg))
     @assertTrue(glc_behavior%allow_multiple_columns_grc(bounds%begg))
+    @assertTrue(glc_behavior%runoff_prescribed_grc(bounds%begg))
   end subroutine init_virtual_behaviorIsCorrect
 
   @Test
@@ -112,6 +114,7 @@ contains
     @assertFalse(glc_behavior%has_virtual_columns_grc(bounds%begg))
     @assertTrue(glc_behavior%get_collapse_to_atm_topo(bounds%begg))
     @assertFalse(glc_behavior%allow_multiple_columns_grc(bounds%begg))
+    @assertTrue(glc_behavior%runoff_prescribed_grc(bounds%begg))
   end subroutine init_single_behaviorIsCorrect
 
   @Test
@@ -254,6 +257,10 @@ contains
     @assertFalse(glc_behavior%rain_to_snow_runs_off_grc(bounds%begg))
     @assertTrue(glc_behavior%rain_to_snow_runs_off_grc(bounds%begg + 1))
     @assertFalse(glc_behavior%rain_to_snow_runs_off_grc(bounds%begg + 2))
+
+    @assertTrue(glc_behavior%runoff_prescribed_grc(bounds%begg))
+    @assertFalse(glc_behavior%runoff_prescribed_grc(bounds%begg + 1))
+    @assertTrue(glc_behavior%runoff_prescribed_grc(bounds%begg + 2))
   end subroutine init_multipleGridCells
 
   ! ------------------------------------------------------------------------
