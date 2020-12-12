@@ -455,8 +455,8 @@ contains
     subroutine translate_glacier_region_behavior
       integer :: i
 
+      glacier_region_behavior(:) = BEHAVIOR_UNSET
       do i = min_glacier_region_id, max_glacier_region_id
-         glacier_region_behavior(i) = BEHAVIOR_UNSET
 
          if (glacier_region_present(i)) then
             SHR_ASSERT_ALL((ubound(glacier_region_behavior_str) >= (/i/)), errMsg(sourcefile, __LINE__))
@@ -488,8 +488,8 @@ contains
     subroutine translate_glacier_region_melt_behavior
       integer :: i
 
+      glacier_region_melt_behavior(:) = BEHAVIOR_UNSET
       do i = min_glacier_region_id, max_glacier_region_id
-         glacier_region_melt_behavior(i) = BEHAVIOR_UNSET
 
          if (glacier_region_present(i)) then
             SHR_ASSERT_ALL((ubound(glacier_region_melt_behavior_str) >= (/i/)), errMsg(sourcefile, __LINE__))
@@ -519,8 +519,8 @@ contains
     subroutine translate_glacier_region_ice_runoff_behavior
       integer :: i
 
+      glacier_region_ice_runoff_behavior(:) = BEHAVIOR_UNSET
       do i = min_glacier_region_id, max_glacier_region_id
-         glacier_region_ice_runoff_behavior(i) = BEHAVIOR_UNSET
 
          if (glacier_region_present(i)) then
             SHR_ASSERT_ALL((ubound(glacier_region_ice_runoff_behavior_str) >= (/i/)), errMsg(sourcefile, __LINE__))
@@ -549,8 +549,8 @@ contains
     subroutine translate_glacier_region_runoff_prescribed_behavior
       integer :: i
 
+      glacier_region_runoff_prescribed_behavior(:) = BEHAVIOR_UNSET
       do i = min_glacier_region_id, max_glacier_region_id
-         glacier_region_ice_runoff_behavior(i) = BEHAVIOR_UNSET
 
          if (glacier_region_present(i)) then
             SHR_ASSERT_ALL((ubound(glacier_region_runoff_prescribed_behavior_str) >= (/i/)), errMsg(sourcefile, __LINE__))
@@ -579,8 +579,8 @@ contains
     subroutine translate_glacier_region_rain_to_snow_behavior
       integer :: i
 
+      glacier_region_rain_to_snow_behavior(:) = BEHAVIOR_UNSET
       do i = min_glacier_region_id, max_glacier_region_id
-         glacier_region_rain_to_snow_behavior(i) = BEHAVIOR_UNSET
 
          if (glacier_region_present(i)) then
             SHR_ASSERT_ALL((ubound(glacier_region_rain_to_snow_behavior_str) >= [i]), errMsg(sourcefile, __LINE__))

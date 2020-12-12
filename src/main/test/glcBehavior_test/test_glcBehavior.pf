@@ -236,7 +236,7 @@ contains
          glacier_region_behavior_str = ['multiple', 'virtual '], &
          glacier_region_melt_behavior_str = ['replaced_by_ice ', 'remains_in_place'], &
          glacier_region_ice_runoff_behavior_str = ['remains_ice', 'melted     '], &
-         glacier_region_runoff_prescribed_behavior_str = ['prescribed'], &
+         glacier_region_runoff_prescribed_behavior_str = ['prescribed', 'prognostic'], &
          glacier_region_rain_to_snow_behavior_str = ['converted_to_snow', 'runs_off         '])
 
     @assertFalse(glc_behavior%has_virtual_columns_grc(bounds%begg))
@@ -342,7 +342,7 @@ contains
          glacier_region_behavior_str = ['multiple          ', 'single_at_atm_topo'], &
          glacier_region_melt_behavior_str = ['remains_in_place', 'remains_in_place'], &
          glacier_region_ice_runoff_behavior_str = ['remains_ice', 'remains_ice'], &
-         glacier_region_runoff_prescribed_behavior_str = ['prescribed'], &
+         glacier_region_runoff_prescribed_behavior_str = ['prescribed', 'prognostic'], &
          glacier_region_rain_to_snow_behavior_str = ['converted_to_snow', 'converted_to_snow'])
 
     ! Exercise
