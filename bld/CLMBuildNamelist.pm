@@ -2073,6 +2073,7 @@ sub setup_logic_glacier {
      add_default($opts,  $nl_flags->{'inputdata_rootdir'}, $definition, $defaults, $nl, 'glacier_region_behavior');
      add_default($opts,  $nl_flags->{'inputdata_rootdir'}, $definition, $defaults, $nl, 'glacier_region_melt_behavior');
      add_default($opts,  $nl_flags->{'inputdata_rootdir'}, $definition, $defaults, $nl, 'glacier_region_ice_runoff_behavior');
+     add_default($opts,  $nl_flags->{'inputdata_rootdir'}, $definition, $defaults, $nl, 'glacier_region_runoff_prescribed_behavior');
      add_default($opts,  $nl_flags->{'inputdata_rootdir'}, $definition, $defaults, $nl, 'glacier_region_rain_to_snow_behavior');
   }
 }
@@ -2525,10 +2526,12 @@ sub setup_logic_dynamic_subgrid {
    setup_logic_do_transient_crops($opts, $nl_flags, $definition, $defaults, $nl, $physv);
    setup_logic_do_harvest($opts, $nl_flags, $definition, $defaults, $nl, $physv);
 
-   add_default($opts, $nl_flags->{'inputdata_rootdir'}, $definition, $defaults, $nl, 'reset_dynbal_baselines');
-   if ( &value_is_true($nl->get_value('reset_dynbal_baselines')) &&
-        &remove_leading_and_trailing_quotes($nl_flags->{'clm_start_type'}) eq "branch") {
-      $log->fatal_error("reset_dynbal_baselines has no effect in a branch run");
+   if ($physv->as_long() >= $physv->as_long("clm4_5")) {
+      add_default($opts, $nl_flags->{'inputdata_rootdir'}, $definition, $defaults, $nl, 'reset_dynbal_baselines');
+      if ( &value_is_true($nl->get_value('reset_dynbal_baselines')) &&
+           &remove_leading_and_trailing_quotes($nl_flags->{'clm_start_type'}) eq "branch") {
+         $log->fatal_error("reset_dynbal_baselines has no effect in a branch run");
+      }
    }
 }
 

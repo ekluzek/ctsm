@@ -507,6 +507,17 @@ Allowed values are:
 Only applies when melt_non_icesheet_ice_runoff is .true.
 </entry>
 
+<entry id="glacier_region_runoff_prescribed_behavior" type="char*32(10)" category="clm_physics"
+       group="clm_glacier_behavior"
+       valid_values="prescribed,prognostic" >
+Treatment of runoff for each glacier region (GLACIER_REGION in surface dataset).
+First item corresponds to GLACIER_REGION with ID 0 in the surface dataset,
+second to GLACIER_REGION with ID 1, etc.
+Allowed values are:
+'prescribed': runoff over the glacier region is prescribed from a stream dataset
+'prognostic': runoff is handled normally according to the CTSM physics
+</entry>
+
 <entry id="glacier_region_rain_to_snow_behavior" type="char*32(10)" category="clm_physics"
        group="clm_glacier_behavior"
        valid_values="converted_to_snow,runs_off" >
