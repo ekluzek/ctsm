@@ -2864,7 +2864,7 @@ sub setup_logic_nitrif_params {
 
 sub setup_logic_hydrology_switches {
   #
-  # Check on Switches for hydrology
+  # Check on Switches for hydrology (must be after glacier)
   #
   my ($nl, $physv) = @_;
 
@@ -2909,6 +2909,37 @@ sub setup_logic_hydrology_switches {
      }
      if ( defined($h2osfcflag) && defined($lower) && $h2osfcflag == 0 && $lower != 4 ) {
         $log->fatal_error( "If h2osfcflag is 0 lower_boundary_condition can only be aquifer" );
+     }
+  }
+  #
+  # Streams for prescribed runoff
+  #
+  if ( $physv->as_long() >= $physv->as_long("clm4_5") ) {
+     my $runoff_prescribed = $nl->get_value( "glacier_region_runoff_prescribed_behavior" );
+     if ( $runoff_prescribed =~ /prescribed/ ) {
+        my @required = ( "stream_pres_runoff_first_year", "stream_pres_runoff_last_year", "stream_pres_runoff_fldfilename" );
+        foreach my $var ( @required ) {
+           my $val = $nl->get_value( $var );
+           if ( ! defined($val) ) {
+              $log->fatal_error( "If any runoff is prescribed for glacier_region_runoff_prescribed_behavior variable $var MUST be set" );
+           }
+           my $first = $nl->get_value( "stream_pres_runoff_first_year" );
+           my $last = $nl->get_value( "stream_pres_runoff_last_year" );
+           if ( $last < $first ) {
+              $log->fatal_error( "stream_pres_runoff_last_year is less than stream_pres_runoff_first_year" );
+           }
+        }
+     } else {
+        my @list = ( "stream_pres_runoff_first_year", "stream_pres_runoff_last_year", "stream_pres_runoff_model_year_align",
+                     "stream_pres_runoff_fldfilename", "stream_pres_runoff_taxmode", "stream_pres_runoff_tintalgo", 
+                     "stream_pres_runoff_mapalgo" );
+        foreach my $var ( @list ) {
+           my $val = $nl->get_value( $var );
+           if ( defined($val) ) {
+              $log->fatal_error( "If no runoff is prescribed for glacier_region_runoff_prescribed_behavior variable $var MUST NOT be set" );
+
+           }
+        }
      }
   }
 }
