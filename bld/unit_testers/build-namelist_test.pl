@@ -123,9 +123,9 @@ my $testType="namelistTest";
 #
 # Figure out number of tests that will run
 #
-my $ntests = 920;
+my $ntests = 923;
 if ( defined($opts{'compare'}) ) {
-   $ntests += 558;
+   $ntests += 561;
 }
 plan( tests=>$ntests );
 
@@ -456,6 +456,23 @@ my %failtest = (
                                    },
      "mapvary var w/o varymap"   =>{ options=>"-crop -bgc bgc -envxml_dir . -crop",
                                      namelst=>"baset_mapping='constant', baset_latvary_slope=1.0, baset_latvary_intercept=10.0",
+                                     GLC_TWO_WAY_COUPLING=>"FALSE",
+                                     conopts=>"-phys clm5_0",
+                                   },
+     "presrunoffwoglacierregion" =>{ options=>"-bgc sp -envxml_dir .",
+                                     namelst=>"stream_pres_runoff_fldfilename='test'",
+                                     GLC_TWO_WAY_COUPLING=>"FALSE",
+                                     conopts=>"-phys clm5_0",
+                                   },
+     "glacierregionwostreamfile"  =>{ options=>"-bgc sp -envxml_dir .",
+                                     namelst=>"glacier_region_runoff_prescribed_behavior='prescribed'",
+                                     GLC_TWO_WAY_COUPLING=>"FALSE",
+                                     conopts=>"-phys clm5_0",
+                                   },
+     "presrunoffstremlastb4first"=>{ options=>"-bgc sp -envxml_dir .",
+                                     namelst=>"stream_pres_runoff_fldfilename='test'," . 
+                                     "glacier_region_runoff_prescribed_behavior='prescribed'," .
+                                     "stream_pres_runoff_last_year=1,stream_pres_runoff_first_year=2",
                                      GLC_TWO_WAY_COUPLING=>"FALSE",
                                      conopts=>"-phys clm5_0",
                                    },
