@@ -123,7 +123,7 @@ my $testType="namelistTest";
 #
 # Figure out number of tests that will run
 #
-my $ntests = 916;
+my $ntests = 920;
 if ( defined($opts{'compare'}) ) {
    $ntests += 558;
 }
@@ -315,6 +315,10 @@ foreach my $options (
                       "-bgc bgc -use_case 1850-2100_SSP1-2.6_transient -namelist '&a start_ymd=20100101/'",
                       "-bgc sp  -use_case 1850-2100_SSP2-4.5_transient -namelist '&a start_ymd=18501223/'",
                       "-bgc bgc -use_case 1850-2100_SSP3-7.0_transient -namelist '&a start_ymd=20701029/'",
+                      "-bgc bgc -crop -use_case 1850_control -res 0.9x1.25 -namelist " . 
+                      "\"&a glacier_region_runoff_prescribed_behavior='prognostic','prescribed'," .
+                      "stream_pres_runoff_fldfilename='test', stream_pres_runoff_first_year=1," .
+                      "stream_pres_runoff_last_year=1/\"",
                       "-bgc fates  -use_case 2000_control -no-megan",
                       "-bgc sp  -use_case 2000_control -res 0.9x1.25 -namelist '&a use_soil_moisture_streams = T/'",
                       "-bgc cn  -use_case 1850-2100_SSP5-8.5_transient -namelist '&a start_ymd=19201023/'",
