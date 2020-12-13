@@ -2269,28 +2269,28 @@ If surface water is active or not
 <!-- ========================================================================================  -->
 
 <entry id="stream_pres_runoff_first_year" type="integer" category="datasets"
-       group="clm_soilhydrology_inparm" valid_values="" >
+       group="soilhydrology_inparm" valid_values="" >
 First year to loop over for prescribed runoff data
 </entry>
 
 <entry id="stream_pres_runoff_last_year" type="integer" category="datasets"
-       group="clm_soilhydrology_inparm" valid_values="" >
+       group="soilhydrology_inparm" valid_values="" >
 Last year to loop over for prescribed runoff data
 </entry>
 
 <entry id="stream_pres_runoff_model_year_align" type="integer" category="datasets"
-       group="clm_soilhydrology_inparm" valid_values="" >
+       group="soilhydrology_inparm" valid_values="" >
 Simulation year that aligns with stream_pres_runoff_first_year value
 </entry>
 
 <entry id="stream_pres_runoff_fldfilename" type="char*256" category="datasets"
-       input_pathname="abs" group="clm_soilhydrology_inparm" valid_values="" >
+       input_pathname="abs" group="soilhydrology_inparm" valid_values="" >
 Filename of input stream data for prescribed runoff, will be used to override runoff
 for glacier regions where glacier_region_runoff_prescribed_behavior is set to "prescribed".
 </entry>
 
 <entry id="stream_pres_runoff_taxmode" type="char*80" category="datasets"
-       group="clm_soilhydrology_inparm" valid_values="cycle,extend,limit" >
+       group="soilhydrology_inparm" valid_values="cycle,extend,limit" >
 Time interpolation mode to determine how to handle data before and after the times in the file
     cycle   = Always cycle over the data
     extend  = Use the first time before the available data, and use the last time after the available data
@@ -2298,12 +2298,12 @@ Time interpolation mode to determine how to handle data before and after the tim
 </entry>
 
 <entry id="stream_pres_runoff_tintalgo" type="char*80" category="datasets"
-       group="clm_soilhydrology_inparm" valid_values="linear,nearest,lower,upper" >
+       group="soilhydrology_inparm" valid_values="linear,nearest,lower,upper" >
 Time interpolation method to use for prescribed runoff
 </entry>
 
 <entry id="stream_pres_runoff_mapalgo" type="char*256" category="datasets"
-       group="clm_soilhydrology_inparm" valid_values="bilinear,nn,nnoni,nnonj,spval,copy" >
+       group="soilhydrology_inparm" valid_values="bilinear,nn,nnoni,nnonj,spval,copy" >
 Mapping method from prescribed runoff input file to the model resolution
     bilinear = bilinear interpolation
     nn       = nearest neighbor
