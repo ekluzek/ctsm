@@ -1612,6 +1612,15 @@
       <option name="comment"  >Long enough test for SMB to be generated in bare land areas; add a month beyond the 3rd year to allow time for CLM to respond to CISM forcing from the 3rd year. (Note: if we had spun-up initial conditions for an IG compset, we could test this with much shorter test, if it also used the glc override options - much of the need for this long test is to allow the snow pack to spin up.)</option>
     </options>
   </test>
+  <test name="SMS_D" grid="f09_g17_gl4" compset="I1850Clm50BgcCropG" testmods="clm/glcMEC_pres_runoff">
+    <machines>
+      <machine name="cheyenne" compiler="intel" category="aux_clm"/>
+    </machines>
+    <options>
+      <option name="wallclock">00:40:00</option>
+      <option name="comment"  >Test for prescribed runoff.</option>
+    </options>
+  </test>
   <test name="SMS_Ly3_Mmpi-serial" grid="1x1_numaIA" compset="I2000Clm50BgcCropGs" testmods="clm/clm50dynroots">
     <machines>
       <machine name="cheyenne" compiler="intel" category="aux_clm"/>

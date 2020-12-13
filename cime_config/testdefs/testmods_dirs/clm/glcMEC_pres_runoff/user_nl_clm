@@ -1,0 +1,4 @@
+glacier_region_runoff_prescribed_behavior='prescribed','prescribed','prescribed','prescribed','prescribed'
+stream_pres_runoff_fldfilename='$CIME_OUTPUT_ROOT/archive/I1850Clm50BgcCropG.f09_g17_gl4.001/lnd/hist/I1850Clm50BgcCropG.f09_g17_gl4.001.clm2.h1.0001-01-01-00000.nc'
+stream_pres_runoff_first_year=1
+stream_pres_runoff_last_year=1
