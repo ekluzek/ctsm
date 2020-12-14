@@ -4,7 +4,7 @@ module SoilHydrologyMod
   ! !DESCRIPTION:
   ! Calculate soil hydrology
   !
-  use shr_kind_mod      , only : r8 => shr_kind_r8
+  use shr_kind_mod      , only : r8 => shr_kind_r8, CL => shr_kind_CL, CS => shr_kind_CS
   use shr_log_mod       , only : errMsg => shr_log_errMsg
   use decompMod         , only : bounds_type
   use clm_varctl        , only : iulog, use_vichydro
@@ -39,12 +39,21 @@ module SoilHydrologyMod
   !-----------------------------------------------------------------------
   real(r8), private :: baseflow_scalar = 1.e-2_r8
 
+  ! Prescribed runoff streams control items
+  character(len=CL), private :: stream_pres_runoff_fldfilename  ! prescribed runoff streams filename
+  character(len=CS), private :: stream_pres_runoff_taxmode      ! Time interpolation mode
+  character(len=CS), private :: stream_pres_runoff_tintalgo     ! Time interpolatiuon method
+  character(len=CS), private :: stream_pres_runoff_mapalgo      ! Spational mapping interpolation alogrithm
+  integer, private :: stream_pres_runoff_first_year             ! First year to prescribe runoff over
+  integer, private :: stream_pres_runoff_last_year              ! Last year to prescribe runoff over
+  integer, private :: stream_pres_runoff_model_year_align       ! Simualtion year to align first year with
+
   character(len=*), parameter, private :: sourcefile = &
        __FILE__
 
 contains
 
-  !-----------------------------------------------------------------------
+  !s-----------------------------------------------------------------------
   subroutine soilHydReadNML( NLFilename )
     !
     ! !DESCRIPTION:
@@ -69,13 +78,20 @@ contains
     character(len=*), parameter :: subname = 'soilHydReadNML'
     character(len=*), parameter :: nmlname = 'soilhydrology_inparm'
     !-----------------------------------------------------------------------
-    namelist /soilhydrology_inparm/ baseflow_scalar
+    namelist /soilhydrology_inparm/ baseflow_scalar, stream_pres_runoff_first_year, &
+         stream_pres_runoff_last_year, stream_pres_runoff_model_year_align, &
+         stream_pres_runoff_fldfilename, stream_pres_runoff_taxmode, &
+         stream_pres_runoff_tintalgo, stream_pres_runoff_mapalgo
 
     ! Initialize options to default values, in case they are not specified in
     ! the namelist
 
 
     if (masterproc) then
+       stream_pres_runoff_fldfilename = ' '
+       stream_pres_runoff_taxmode     = 'cycle'
+       stream_pres_runoff_tintalgo     = 'nearest'
+       stream_pres_runoff_mapalgo      = 'bilinear'
        unitn = getavu()
        write(iulog,*) 'Read in '//nmlname//'  namelist'
        call opnfil (NLFilename, unitn, 'F')
@@ -91,7 +107,14 @@ contains
        call relavu( unitn )
     end if
 
-    call shr_mpi_bcast (baseflow_scalar, mpicom)
+    call shr_mpi_bcast (baseflow_scalar,                     mpicom)
+    call shr_mpi_bcast (stream_pres_runoff_first_year,       mpicom)
+    call shr_mpi_bcast (stream_pres_runoff_last_year,        mpicom)
+    call shr_mpi_bcast (stream_pres_runoff_model_year_align, mpicom)
+    call shr_mpi_bcast (stream_pres_runoff_fldfilename,      mpicom)
+    call shr_mpi_bcast (stream_pres_runoff_taxmode,          mpicom)
+    call shr_mpi_bcast (stream_pres_runoff_tintalgo,         mpicom)
+    call shr_mpi_bcast (stream_pres_runoff_mapalgo,          mpicom)
 
     if (masterproc) then
        write(iulog,*) ' '
