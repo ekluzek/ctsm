@@ -4,9 +4,9 @@ module SoilHydrologyMod
   ! !DESCRIPTION:
   ! Calculate soil hydrology
   !
-  use shr_kind_mod      , only : r8 => shr_kind_r8, CL => shr_kind_CL, CS => shr_kind_CS
+  use shr_kind_mod      , only : r8 => shr_kind_r8, CL => shr_kind_CL, CS => shr_kind_CS, CXX => shr_kind_CXX
   use shr_log_mod       , only : errMsg => shr_log_errMsg
-  use decompMod         , only : bounds_type
+  use decompMod         , only : bounds_type, gsmap_lnd_gdc2glo
   use clm_varctl        , only : iulog, use_vichydro
   use clm_varcon        , only : e_ice, denh2o, denice, rpi, aquifer_water_baseline
   use EnergyFluxType    , only : energyflux_type
@@ -18,6 +18,7 @@ module SoilHydrologyMod
   use LandunitType      , only : lun                
   use ColumnType        , only : col                
   use PatchType         , only : patch                
+  use shr_strdata_mod   , only : shr_strdata_type
   !
   ! !PUBLIC TYPES:
   implicit none
@@ -35,6 +36,9 @@ module SoilHydrologyMod
   public :: ThetaBasedWaterTable ! Calculate water table from soil moisture state
   public :: LateralFlowPowerLaw  ! Calculate lateral flow based on power law drainage function
   public :: RenewCondensation    ! Misc. corrections
+  public :: PrescribedRunoffInit    ! position datasets for runoff
+  !public :: PrescribedRunoffAdvance ! Advance the runoff stream (outside of Open-MP loops)
+  !public :: PrescribedRunoffInterp  ! interpolates between two periods of runoff data
 
   !-----------------------------------------------------------------------
   real(r8), private :: baseflow_scalar = 1.e-2_r8
@@ -47,6 +51,13 @@ module SoilHydrologyMod
   integer, private :: stream_pres_runoff_first_year             ! First year to prescribe runoff over
   integer, private :: stream_pres_runoff_last_year              ! Last year to prescribe runoff over
   integer, private :: stream_pres_runoff_model_year_align       ! Simualtion year to align first year with
+  integer, private :: index_QDRAI         = 0                   ! Index of QDRAI field
+  integer, private :: index_QDRAI_PERCH   = 0                   ! Index of QDRAI_PERCH field
+  integer, private :: index_QH2OSFC       = 0                   ! Index of QH2OSFC field
+  integer, private :: index_QOVER         = 0                   ! Index of QOVER field
+
+  type(shr_strdata_type) :: sdat_runoff   ! Runoff input data stream
+  integer, allocatable :: g_to_ig(:)      ! Array matching gridcell index to data index
 
   character(len=*), parameter, private :: sourcefile = &
        __FILE__
@@ -124,6 +135,91 @@ contains
     end if
 
   end subroutine soilhydReadNML
+
+  !-----------------------------------------------------------------------
+  !
+  ! Initialize prescribed runoff
+  !
+  !-----------------------------------------------------------------------
+  subroutine PrescribedRunoffInit(bounds)
+    !
+    ! Initialize data stream information for runoff
+    !
+    !
+    ! !USES:
+    use clm_varctl       , only : inst_name
+    use clm_time_manager , only : get_calendar
+    use ncdio_pio        , only : pio_subsystem
+    use shr_pio_mod      , only : shr_pio_getiotype
+    use clm_nlUtilsMod   , only : find_nlgroup_name
+    use ndepStreamMod    , only : clm_domain_mct
+    use shr_stream_mod   , only : shr_stream_file_null
+    use shr_string_mod   , only : shr_string_listCreateField
+    use domainMod        , only : ldomain
+    use mct_mod          , only : mct_ggrid, mct_avect_indexra
+    use shr_strdata_mod  , only : shr_strdata_create
+    use shr_strdata_mod  , only : shr_strdata_print
+    use spmdMod          , only : masterproc, mpicom, comp_id
+    !
+    ! !ARGUMENTS:
+    implicit none
+    type(bounds_type), intent(in) :: bounds          ! bounds
+    !
+    ! !LOCAL VARIABLES:
+    integer            :: runoff_offset              ! Offset in time for dataset (sec)
+    type(mct_ggrid)    :: dom_clm                    ! domain information
+    character(*), parameter    :: subName = "('PrescribedRunoffInit')"
+    character(*), parameter    :: runoffString = "QDRAI:QDRAI_PERCH:QH2OSFC:QOVER"  ! base string for field string
+    character(CXX)             :: fldList            ! field string
+
+    runoff_offset = 0
+    call clm_domain_mct (bounds, dom_clm )
+    !
+    ! create the field list for these fields...use in shr_strdata_create
+    !
+    fldList = trim(runoffString)
+
+    if (masterproc) write(iulog,*) 'fieldlist: ', trim(fldList)
+
+    call shr_strdata_create(sdat_runoff,name="runoff", &
+         pio_subsystem=pio_subsystem,                  &
+         pio_iotype=shr_pio_getiotype(inst_name),      &
+         mpicom=mpicom, compid=comp_id,                &
+         gsmap=gsmap_lnd_gdc2glo, ggrid=dom_clm,       &
+         nxg=ldomain%ni, nyg=ldomain%nj,               &
+         yearFirst=stream_pres_runoff_first_year,       &
+         yearLast=stream_pres_runoff_last_year,         &
+         yearAlign=stream_pres_runoff_model_year_align, &
+         offset=runoff_offset,                          &
+         domFilePath='',                               &
+         domFileName=trim(stream_pres_runoff_fldfilename),   &
+         domTvarName='time',                           &
+         domXvarName='lon' ,                           &
+         domYvarName='lat' ,                           &
+         domAreaName='area',                           &
+         domMaskName='landmask',                       &
+         filePath='',                                  &
+         filename=(/stream_pres_runoff_fldfilename/),  &
+         fldListFile=fldList,                          &
+         fldListModel=fldList,                         &
+         fillalgo='none',                              &
+         mapalgo=stream_pres_runoff_mapalgo,           &
+         tintalgo=stream_pres_runoff_tintalgo,         &
+         calendar=get_calendar(),                      &
+         dtlimit = 15._r8,                             &
+         taxmode=stream_pres_runoff_taxmode            )
+
+    if (masterproc) then
+       call shr_strdata_print(sdat_runoff,'Runoff data')
+    endif
+
+    ! Get indices of the runoff elements in the streams file
+    index_QDRAI        = mct_avect_indexra(sdat_runoff%avs(1),'QDRAI')
+    index_QDRAI_PERCH  = mct_avect_indexra(sdat_runoff%avs(1),'QDRAI_PERCH')
+    index_QH2OSFC      = mct_avect_indexra(sdat_runoff%avs(1),'QH2OSFC')
+    index_QOVER        = mct_avect_indexra(sdat_runoff%avs(1),'QOVER')
+
+  end subroutine PrescribedRunoffInit
 
   !-----------------------------------------------------------------------
   subroutine SurfaceRunoff (bounds, num_hydrologyc, filter_hydrologyc, &
