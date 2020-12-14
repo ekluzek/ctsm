@@ -40,7 +40,7 @@ module SoilHydrologyMod
   public :: RenewCondensation    ! Misc. corrections
   public :: PrescribedRunoffInit    ! position datasets for runoff
   public :: PrescribedRunoffAdvance ! Advance the runoff stream (outside of Open-MP loops)
-  !public :: PrescribedRunoffInterp  ! interpolates between two periods of runoff data
+  public :: PrescribedRunoffInterp  ! interpolates between two periods of runoff data
 
   !-----------------------------------------------------------------------
   real(r8), private :: baseflow_scalar = 1.e-2_r8
@@ -57,6 +57,7 @@ module SoilHydrologyMod
   integer, private :: index_QDRAI_PERCH   = 0                   ! Index of QDRAI_PERCH field
   integer, private :: index_QH2OSFC       = 0                   ! Index of QH2OSFC field
   integer, private :: index_QOVER         = 0                   ! Index of QOVER field
+  integer, private :: index_QRGWL         = 0                   ! Index of QRGWL field
   character(len=*), parameter  :: stream_var_name = 'runoff'
 
   type(shr_strdata_type) :: sdat_runoff   ! Runoff input data stream
@@ -171,7 +172,7 @@ contains
     integer            :: runoff_offset              ! Offset in time for dataset (sec)
     type(mct_ggrid)    :: dom_clm                    ! domain information
     character(*), parameter    :: subName = "('PrescribedRunoffInit')"
-    character(*), parameter    :: runoffString = "QDRAI:QDRAI_PERCH:QH2OSFC:QOVER"  ! base string for field string
+    character(*), parameter    :: runoffString = "QDRAI:QDRAI_PERCH:QH2OSFC:QOVER:QRGWL"  ! base string for field string
     character(CXX)             :: fldList            ! field string
 
     runoff_offset = 0
@@ -221,6 +222,7 @@ contains
     index_QDRAI_PERCH  = mct_avect_indexra(sdat_runoff%avs(1),'QDRAI_PERCH')
     index_QH2OSFC      = mct_avect_indexra(sdat_runoff%avs(1),'QH2OSFC')
     index_QOVER        = mct_avect_indexra(sdat_runoff%avs(1),'QOVER')
+    index_QRGWL        = mct_avect_indexra(sdat_runoff%avs(1),'QRGWL')
 
   end subroutine PrescribedRunoffInit
 
@@ -271,6 +273,58 @@ contains
     end if
 
   end subroutine PrescribedRunoffAdvance
+
+  subroutine PrescribedRunoffInterp( bounds, num_hydrologyc, filter_hydrologyc, &
+                                     glc_behavior, waterflux_inst )
+    !
+    ! !DESCRIPTION:
+    ! Time-interpolate prescribed runoff
+    !
+    ! !USES:
+    use glcBehaviorMod , only : glc_behavior_type
+    ! !ARGUMENTS:
+    type(bounds_type)       , intent(in)    :: bounds               
+    integer                 , intent(in)    :: num_hydrologyc       ! number of column soil points in column filter
+    integer                 , intent(in)    :: filter_hydrologyc(:) ! column filter for soil points
+    type(glc_behavior_type) , intent(in)    :: glc_behavior
+    type(waterflux_type)    , intent(inout) :: waterflux_inst
+    !
+    ! !LOCAL VARIABLES:
+    integer :: fc,c,g,ig     ! Indices
+    character(len=32) :: subname = 'PrescribedRunoffInterp'         !subroutine name
+    !-----------------------------------------------------------------------
+
+    associate(                                                              & 
+         qflx_surf             => waterflux_inst%qflx_surf_col            , & ! Output: [real(r8) (:)   ]  surface runoff (mm H2O /s)                        
+         qflx_drain            => waterflux_inst%qflx_drain_col           , & ! Output: [real(r8) (:)   ]  sub-surface runoff (mm H2O /s)                    
+         qflx_drain_perched    => waterflux_inst%qflx_drain_perched_col   , & ! Output: [real(r8) (:)   ]  perched wt sub-surface runoff (mm H2O /s)         
+         qflx_h2osfc_surf      => waterflux_inst%qflx_h2osfc_surf_col     , & ! Output: [real(r8) (:)   ]  surface water runoff (mm/s)                       
+         qflx_qrgwl            => waterflux_inst%qflx_qrgwl_col           , & ! Output: [real(r8) (:)   ] qflx_surf at glaciers, wetlands, lakes (mm H2O /s)
+         qflx_ice_runoff_xs    => waterflux_inst%qflx_ice_runoff_xs_col   , & ! Output: [real(r8) (:)   ] solid runoff from excess ice in soil (mm H2O /s) [+]
+         qflx_ice_runoff_snwcp => waterflux_inst%qflx_ice_runoff_snwcp_col  & ! Output:  [real(r8) (:)   ] solid runoff from snow capping (mm H2O /s)
+         )
+         do fc = 1, num_hydrologyc
+            c = filter_hydrologyc(fc)
+            !
+            ! Set variable for each gridcell/column combination
+            !
+            g = col%gridcell(c)
+
+
+            if ( glc_behavior%runoff_prescribed_grc(g) )then
+               ig = g_to_ig(g)
+
+               qflx_surf(c)          = sdat_runoff%avs(1)%rAttr(index_QOVER,  ig)
+               qflx_h2osfc_surf(c)   = sdat_runoff%avs(1)%rAttr(index_QH2OSFC,ig)
+               qflx_drain(c)         = sdat_runoff%avs(1)%rAttr(index_QDRAI,  ig)
+               qflx_qrgwl(c)         = sdat_runoff%avs(1)%rAttr(index_QRGWL,  ig)
+               qflx_drain_perched(c) = sdat_runoff%avs(1)%rAttr(index_QDRAI_PERCH,ig)
+            end if
+
+         end do
+    end associate
+
+  end subroutine PrescribedRunoffInterp
 
   !-----------------------------------------------------------------------
   subroutine SurfaceRunoff (bounds, num_hydrologyc, filter_hydrologyc, &
