@@ -7,6 +7,7 @@ module SoilHydrologyMod
   use shr_kind_mod      , only : r8 => shr_kind_r8, CL => shr_kind_CL, CS => shr_kind_CS, CXX => shr_kind_CXX
   use shr_log_mod       , only : errMsg => shr_log_errMsg
   use decompMod         , only : bounds_type, gsmap_lnd_gdc2glo
+  use abortutils        , only : endrun
   use clm_varctl        , only : iulog, use_vichydro
   use clm_varcon        , only : e_ice, denh2o, denice, rpi, aquifer_water_baseline
   use EnergyFluxType    , only : energyflux_type
@@ -19,6 +20,7 @@ module SoilHydrologyMod
   use ColumnType        , only : col                
   use PatchType         , only : patch                
   use shr_strdata_mod   , only : shr_strdata_type
+  use spmdMod           , only : mpicom
   !
   ! !PUBLIC TYPES:
   implicit none
@@ -37,7 +39,7 @@ module SoilHydrologyMod
   public :: LateralFlowPowerLaw  ! Calculate lateral flow based on power law drainage function
   public :: RenewCondensation    ! Misc. corrections
   public :: PrescribedRunoffInit    ! position datasets for runoff
-  !public :: PrescribedRunoffAdvance ! Advance the runoff stream (outside of Open-MP loops)
+  public :: PrescribedRunoffAdvance ! Advance the runoff stream (outside of Open-MP loops)
   !public :: PrescribedRunoffInterp  ! interpolates between two periods of runoff data
 
   !-----------------------------------------------------------------------
@@ -55,6 +57,7 @@ module SoilHydrologyMod
   integer, private :: index_QDRAI_PERCH   = 0                   ! Index of QDRAI_PERCH field
   integer, private :: index_QH2OSFC       = 0                   ! Index of QH2OSFC field
   integer, private :: index_QOVER         = 0                   ! Index of QOVER field
+  character(len=*), parameter  :: stream_var_name = 'runoff'
 
   type(shr_strdata_type) :: sdat_runoff   ! Runoff input data stream
   integer, allocatable :: g_to_ig(:)      ! Array matching gridcell index to data index
@@ -73,10 +76,9 @@ contains
     ! !USES:
     use fileutils      , only : getavu, relavu, opnfil
     use shr_nl_mod     , only : shr_nl_find_group_name
-    use spmdMod        , only : masterproc, mpicom
+    use spmdMod        , only : masterproc
     use shr_mpi_mod    , only : shr_mpi_bcast
     use clm_varctl     , only : iulog
-    use shr_log_mod    , only : errMsg => shr_log_errMsg
     use abortutils     , only : endrun
     !
     ! !ARGUMENTS:
@@ -159,7 +161,7 @@ contains
     use mct_mod          , only : mct_ggrid, mct_avect_indexra
     use shr_strdata_mod  , only : shr_strdata_create
     use shr_strdata_mod  , only : shr_strdata_print
-    use spmdMod          , only : masterproc, mpicom, comp_id
+    use spmdMod          , only : masterproc, comp_id
     !
     ! !ARGUMENTS:
     implicit none
@@ -181,7 +183,8 @@ contains
 
     if (masterproc) write(iulog,*) 'fieldlist: ', trim(fldList)
 
-    call shr_strdata_create(sdat_runoff,name="runoff", &
+    call shr_strdata_create(sdat_runoff,               &
+         name=stream_var_name,                         &
          pio_subsystem=pio_subsystem,                  &
          pio_iotype=shr_pio_getiotype(inst_name),      &
          mpicom=mpicom, compid=comp_id,                &
@@ -220,6 +223,54 @@ contains
     index_QOVER        = mct_avect_indexra(sdat_runoff%avs(1),'QOVER')
 
   end subroutine PrescribedRunoffInit
+
+  !-----------------------------------------------------------------------
+  !
+  ! PrescribedRunoffAdvance
+  !
+  !-----------------------------------------------------------------------
+  subroutine PrescribedRunoffAdvance( bounds )
+    !
+    ! Advanace the prescribed runoff stream
+    !
+    ! !USES:
+    use clm_time_manager, only : get_curr_date
+    use shr_strdata_mod , only : shr_strdata_advance
+    !
+    ! !ARGUMENTS:
+    type(bounds_type), intent(in)    :: bounds
+    !
+    ! !LOCAL VARIABLES:
+    integer :: g, ig   ! Indices
+    integer :: ier     ! error code
+    integer :: year    ! year (0, ...) for nstep+1
+    integer :: mon     ! month (1, ..., 12) for nstep+1
+    integer :: day     ! day of month (1, ..., 31) for nstep+1
+    integer :: sec     ! seconds into current date for nstep+1
+    integer :: mcdate  ! Current model date (yyyymmdd)
+
+    call get_curr_date(year, mon, day, sec)
+    mcdate = year*10000 + mon*100 + day
+
+    call shr_strdata_advance(sdat_runoff, mcdate, sec, mpicom, trim(stream_var_name))
+
+    ! Map gridcell to AV index
+    ier = 0
+    if ( .not. allocated(g_to_ig) )then
+       allocate (g_to_ig(bounds%begg:bounds%endg), stat=ier)
+       if (ier /= 0) then
+          write(iulog,*) 'Prescribed runoff allocation error'
+          call endrun(msg=errMsg(sourcefile, __LINE__))
+       end if
+
+       ig = 0
+       do g = bounds%begg,bounds%endg
+          ig = ig+1
+          g_to_ig(g) = ig
+       end do
+    end if
+
+  end subroutine PrescribedRunoffAdvance
 
   !-----------------------------------------------------------------------
   subroutine SurfaceRunoff (bounds, num_hydrologyc, filter_hydrologyc, &
