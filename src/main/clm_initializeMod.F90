@@ -503,6 +503,7 @@ contains
     if(use_soil_moisture_streams) then 
        call PrescribedSoilMoistureInit(bounds_proc)
     endif
+    !call PrescribedRunoffInit(bounds_proc, glc_behavior)
 
     
 

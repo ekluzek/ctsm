@@ -326,6 +326,16 @@ contains
        call PrescribedSoilMoistureAdvance( bounds_proc )
        call t_stopf('prescribed_sm')
     endif
+
+    ! ============================================================================
+    ! If runoff is prescribed from data streams set it here
+    ! NOTE: This call needs to happen outside loops over nclumps (as streams are not threadsafe).
+    ! ============================================================================
+    !if ( PrescribedRunoff( ) )then
+    ! call t_startf('PrescribedRunoffAdvance')
+    ! call PrescribedRunoffAdvance( bounds_proc )
+    ! call t_stopf('PrescribedRunoffAdvance')
+    !endif
     ! ============================================================================
     ! Initialize the column-level mass balance checks for water, carbon & nitrogen.
     !
@@ -940,6 +950,14 @@ contains
        end if
 
 
+       ! Prescribe runoff over the regions it should be changed
+       !if ( PrescribedRunoff( ) )then
+       ! call t_startf('PrescribedRunoffInterp')
+       ! call PrescribedRunoffInterp(bounds_clump,                   &
+       !        filter(nc)%num_hydrologyc, filter(nc)%hydrologyc,    &
+       !        glc_behavior, waterflux_inst )
+       ! call t_stopf('PrescribedRunoffInterp')
+       !end if
 
        ! ============================================================================
        ! Check the energy and water balance and also carbon and nitrogen balance

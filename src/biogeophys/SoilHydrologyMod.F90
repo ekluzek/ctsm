@@ -7,6 +7,7 @@ module SoilHydrologyMod
   use shr_kind_mod      , only : r8 => shr_kind_r8, CL => shr_kind_CL, CS => shr_kind_CS, CXX => shr_kind_CXX
   use shr_log_mod       , only : errMsg => shr_log_errMsg
   use decompMod         , only : bounds_type, gsmap_lnd_gdc2glo
+  use glcBehaviorMod    , only : glc_behavior_type
   use abortutils        , only : endrun
   use clm_varctl        , only : iulog, use_vichydro
   use clm_varcon        , only : e_ice, denh2o, denice, rpi, aquifer_water_baseline
@@ -46,20 +47,22 @@ module SoilHydrologyMod
   real(r8), private :: baseflow_scalar = 1.e-2_r8
 
   ! Prescribed runoff streams control items
-  character(len=CL), private :: stream_pres_runoff_fldfilename  ! prescribed runoff streams filename
-  character(len=CS), private :: stream_pres_runoff_taxmode      ! Time interpolation mode
-  character(len=CS), private :: stream_pres_runoff_tintalgo     ! Time interpolatiuon method
-  character(len=CS), private :: stream_pres_runoff_mapalgo      ! Spational mapping interpolation alogrithm
-  integer, private :: stream_pres_runoff_first_year             ! First year to prescribe runoff over
-  integer, private :: stream_pres_runoff_last_year              ! Last year to prescribe runoff over
-  integer, private :: stream_pres_runoff_model_year_align       ! Simualtion year to align first year with
-  integer, private :: index_QDRAI         = 0                   ! Index of QDRAI field
-  integer, private :: index_QDRAI_PERCH   = 0                   ! Index of QDRAI_PERCH field
-  integer, private :: index_QH2OSFC       = 0                   ! Index of QH2OSFC field
-  integer, private :: index_QOVER         = 0                   ! Index of QOVER field
-  integer, private :: index_QRGWL         = 0                   ! Index of QRGWL field
+  integer, parameter :: unset = -9                                ! Integer flag to describe integeer as unset
+  character(len=CL), private :: stream_pres_runoff_fldfilename    ! prescribed runoff streams filename
+  character(len=CS), private :: stream_pres_runoff_taxmode        ! Time interpolation mode
+  character(len=CS), private :: stream_pres_runoff_tintalgo       ! Time interpolatiuon method
+  character(len=CS), private :: stream_pres_runoff_mapalgo        ! Spational mapping interpolation alogrithm
+  integer, private :: stream_pres_runoff_first_year = unset       ! First year to prescribe runoff over
+  integer, private :: stream_pres_runoff_last_year  = unset       ! Last year to prescribe runoff over
+  integer, private :: stream_pres_runoff_model_year_align = unset ! Simualtion year to align first year with
+  integer, private :: index_QDRAI         = 0                     ! Index of QDRAI field
+  integer, private :: index_QDRAI_PERCH   = 0                     ! Index of QDRAI_PERCH field
+  integer, private :: index_QH2OSFC       = 0                     ! Index of QH2OSFC field
+  integer, private :: index_QOVER         = 0                     ! Index of QOVER field
+  integer, private :: index_QRGWL         = 0                     ! Index of QRGWL field
   character(len=*), parameter  :: stream_var_name = 'runoff'
 
+  logical :: prescribed_runoff_gridcells = .false.              ! If any gridcells should have runoff prescribed
   type(shr_strdata_type) :: sdat_runoff   ! Runoff input data stream
   integer, allocatable :: g_to_ig(:)      ! Array matching gridcell index to data index
 
@@ -104,8 +107,8 @@ contains
     if (masterproc) then
        stream_pres_runoff_fldfilename = ' '
        stream_pres_runoff_taxmode     = 'cycle'
-       stream_pres_runoff_tintalgo     = 'nearest'
-       stream_pres_runoff_mapalgo      = 'bilinear'
+       stream_pres_runoff_tintalgo    = 'nearest'
+       stream_pres_runoff_mapalgo     = 'bilinear'
        unitn = getavu()
        write(iulog,*) 'Read in '//nmlname//'  namelist'
        call opnfil (NLFilename, unitn, 'F')
@@ -140,11 +143,19 @@ contains
   end subroutine soilhydReadNML
 
   !-----------------------------------------------------------------------
-  !
-  ! Initialize prescribed runoff
-  !
+  logical function PrescribedRunoff( )
+    !
+    ! Return true if prescribed runoff is specified over any area of the file
+    !
+    if ( prescribed_runoff_gridcells )then
+       PrescribedRunoff = .true.
+    else
+       PrescribedRunoff = .false.
+    end if
+  end function PrescribedRunoff
+
   !-----------------------------------------------------------------------
-  subroutine PrescribedRunoffInit(bounds)
+  subroutine PrescribedRunoffInit(bounds, glc_behavior)
     !
     ! Initialize data stream information for runoff
     !
@@ -166,70 +177,97 @@ contains
     !
     ! !ARGUMENTS:
     implicit none
-    type(bounds_type), intent(in) :: bounds          ! bounds
+    type(bounds_type),        intent(in) :: bounds          ! bounds
+    type(glc_behavior_type) , intent(in) :: glc_behavior
     !
     ! !LOCAL VARIABLES:
+    integer            :: g                          ! Indices
     integer            :: runoff_offset              ! Offset in time for dataset (sec)
     type(mct_ggrid)    :: dom_clm                    ! domain information
     character(*), parameter    :: subName = "('PrescribedRunoffInit')"
     character(*), parameter    :: runoffString = "QDRAI:QDRAI_PERCH:QH2OSFC:QOVER:QRGWL"  ! base string for field string
     character(CXX)             :: fldList            ! field string
 
-    runoff_offset = 0
-    call clm_domain_mct (bounds, dom_clm )
     !
-    ! create the field list for these fields...use in shr_strdata_create
+    ! First check if there are any gridcells that are going to have prescribed
+    ! runoff
     !
-    fldList = trim(runoffString)
+    do g = bounds%begg,bounds%endg
+       if ( glc_behavior%runoff_prescribed_grc(g) )then
+          prescribed_runoff_gridcells = .true.
+       end if
+    end do 
+    !
+    if ( prescribed_runoff_gridcells )then
 
-    if (masterproc) write(iulog,*) 'fieldlist: ', trim(fldList)
+       if ( len_trim(stream_pres_runoff_fldfilename) == 0 )then
+          call endrun(msg="stream_pres_runoff_fldfilename is NOT set"//errMsg(sourcefile, __LINE__))
+       end if
+       if ( stream_pres_runoff_first_year == unset )then
+          call endrun(msg="stream_pres_runoff_first_year is NOT set"//errMsg(sourcefile, __LINE__))
+       end if
+       if ( stream_pres_runoff_last_year == unset )then
+          call endrun(msg="stream_pres_runoff_last_year is NOT set"//errMsg(sourcefile, __LINE__))
+       end if
+       if ( stream_pres_runoff_model_year_align == unset )then
+          call endrun(msg="stream_pres_runoff_model_year_align is NOT set"//errMsg(sourcefile, __LINE__))
+       end if
+       !
+       runoff_offset = 0
+       call clm_domain_mct (bounds, dom_clm )
+       !
+       ! create the field list for these fields...use in shr_strdata_create
+       !
+       fldList = trim(runoffString)
 
-    call shr_strdata_create(sdat_runoff,               &
-         name=stream_var_name,                         &
-         pio_subsystem=pio_subsystem,                  &
-         pio_iotype=shr_pio_getiotype(inst_name),      &
-         mpicom=mpicom, compid=comp_id,                &
-         gsmap=gsmap_lnd_gdc2glo, ggrid=dom_clm,       &
-         nxg=ldomain%ni, nyg=ldomain%nj,               &
-         yearFirst=stream_pres_runoff_first_year,       &
-         yearLast=stream_pres_runoff_last_year,         &
-         yearAlign=stream_pres_runoff_model_year_align, &
-         offset=runoff_offset,                          &
-         domFilePath='',                               &
-         domFileName=trim(stream_pres_runoff_fldfilename),   &
-         domTvarName='time',                           &
-         domXvarName='lon' ,                           &
-         domYvarName='lat' ,                           &
-         domAreaName='area',                           &
-         domMaskName='landmask',                       &
-         filePath='',                                  &
-         filename=(/stream_pres_runoff_fldfilename/),  &
-         fldListFile=fldList,                          &
-         fldListModel=fldList,                         &
-         fillalgo='none',                              &
-         mapalgo=stream_pres_runoff_mapalgo,           &
-         tintalgo=stream_pres_runoff_tintalgo,         &
-         calendar=get_calendar(),                      &
-         dtlimit = 15._r8,                             &
-         taxmode=stream_pres_runoff_taxmode            )
+       if (masterproc) write(iulog,*) 'fieldlist: ', trim(fldList)
 
-    if (masterproc) then
-       call shr_strdata_print(sdat_runoff,'Runoff data')
-    endif
+       call shr_strdata_create(sdat_runoff,               &
+            name=stream_var_name,                         &
+            pio_subsystem=pio_subsystem,                  &
+            pio_iotype=shr_pio_getiotype(inst_name),      &
+            mpicom=mpicom, compid=comp_id,                &
+            gsmap=gsmap_lnd_gdc2glo, ggrid=dom_clm,       &
+            nxg=ldomain%ni, nyg=ldomain%nj,               &
+            yearFirst=stream_pres_runoff_first_year,       &
+            yearLast=stream_pres_runoff_last_year,         &
+            yearAlign=stream_pres_runoff_model_year_align, &
+            offset=runoff_offset,                          &
+            domFilePath='',                               &
+            domFileName=trim(stream_pres_runoff_fldfilename),   &
+            domTvarName='time',                           &
+            domXvarName='lon' ,                           &
+            domYvarName='lat' ,                           &
+            domAreaName='area',                           &
+            domMaskName='landmask',                       &
+            filePath='',                                  &
+            filename=(/stream_pres_runoff_fldfilename/),  &
+            fldListFile=fldList,                          &
+            fldListModel=fldList,                         &
+            fillalgo='none',                              &
+            mapalgo=stream_pres_runoff_mapalgo,           &
+            tintalgo=stream_pres_runoff_tintalgo,         &
+            calendar=get_calendar(),                      &
+            dtlimit = 15._r8,                             &
+            taxmode=stream_pres_runoff_taxmode            )
 
-    ! Get indices of the runoff elements in the streams file
-    index_QDRAI        = mct_avect_indexra(sdat_runoff%avs(1),'QDRAI')
-    index_QDRAI_PERCH  = mct_avect_indexra(sdat_runoff%avs(1),'QDRAI_PERCH')
-    index_QH2OSFC      = mct_avect_indexra(sdat_runoff%avs(1),'QH2OSFC')
-    index_QOVER        = mct_avect_indexra(sdat_runoff%avs(1),'QOVER')
-    index_QRGWL        = mct_avect_indexra(sdat_runoff%avs(1),'QRGWL')
+       if (masterproc) then
+          call shr_strdata_print(sdat_runoff,'Runoff data')
+       endif
+
+       ! Get indices of the runoff elements in the streams file
+       index_QDRAI        = mct_avect_indexra(sdat_runoff%avs(1),'QDRAI')
+       index_QDRAI_PERCH  = mct_avect_indexra(sdat_runoff%avs(1),'QDRAI_PERCH')
+       index_QH2OSFC      = mct_avect_indexra(sdat_runoff%avs(1),'QH2OSFC')
+       index_QOVER        = mct_avect_indexra(sdat_runoff%avs(1),'QOVER')
+       index_QRGWL        = mct_avect_indexra(sdat_runoff%avs(1),'QRGWL')
+
+    else
+       if (masterproc) write(iulog,*) ' No regions will have runoff prescribed over them'
+    end if
 
   end subroutine PrescribedRunoffInit
 
-  !-----------------------------------------------------------------------
-  !
-  ! PrescribedRunoffAdvance
-  !
   !-----------------------------------------------------------------------
   subroutine PrescribedRunoffAdvance( bounds )
     !
@@ -274,6 +312,7 @@ contains
 
   end subroutine PrescribedRunoffAdvance
 
+  !-----------------------------------------------------------------------
   subroutine PrescribedRunoffInterp( bounds, num_hydrologyc, filter_hydrologyc, &
                                      glc_behavior, waterflux_inst )
     !
@@ -281,7 +320,6 @@ contains
     ! Time-interpolate prescribed runoff
     !
     ! !USES:
-    use glcBehaviorMod , only : glc_behavior_type
     ! !ARGUMENTS:
     type(bounds_type)       , intent(in)    :: bounds               
     integer                 , intent(in)    :: num_hydrologyc       ! number of column soil points in column filter
