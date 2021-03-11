@@ -111,6 +111,8 @@ contains
     use clm_time_manager     , only : get_curr_date
     use clm_varctl           , only : use_lai_streams
     use SatellitePhenologyMod, only : lai_advance
+    use SoilHydrologyMod     , only : PrescribedRunoff, PrescribedRunoffAdvance
+    use SoilHydrologyMod     , only : PrescribedRunoffInterp
     !
     ! !ARGUMENTS:
     implicit none
@@ -331,11 +333,11 @@ contains
     ! If runoff is prescribed from data streams set it here
     ! NOTE: This call needs to happen outside loops over nclumps (as streams are not threadsafe).
     ! ============================================================================
-    !if ( PrescribedRunoff( ) )then
-    ! call t_startf('PrescribedRunoffAdvance')
-    ! call PrescribedRunoffAdvance( bounds_proc )
-    ! call t_stopf('PrescribedRunoffAdvance')
-    !endif
+    if ( PrescribedRunoff( ) )then
+      call t_startf('PrescribedRunoffAdvance')
+      call PrescribedRunoffAdvance( bounds_proc )
+      call t_stopf('PrescribedRunoffAdvance')
+    endif
     ! ============================================================================
     ! Initialize the column-level mass balance checks for water, carbon & nitrogen.
     !
@@ -951,13 +953,13 @@ contains
 
 
        ! Prescribe runoff over the regions it should be changed
-       !if ( PrescribedRunoff( ) )then
-       ! call t_startf('PrescribedRunoffInterp')
-       ! call PrescribedRunoffInterp(bounds_clump,                   &
-       !        filter(nc)%num_hydrologyc, filter(nc)%hydrologyc,    &
-       !        glc_behavior, waterflux_inst )
-       ! call t_stopf('PrescribedRunoffInterp')
-       !end if
+       if ( PrescribedRunoff( ) )then
+        call t_startf('PrescribedRunoffInterp')
+        call PrescribedRunoffInterp(bounds_clump,                   &
+               filter(nc)%num_hydrologyc, filter(nc)%hydrologyc,    &
+               glc_behavior, waterflux_inst )
+        call t_stopf('PrescribedRunoffInterp')
+       end if
 
        ! ============================================================================
        ! Check the energy and water balance and also carbon and nitrogen balance

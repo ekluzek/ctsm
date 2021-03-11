@@ -294,6 +294,7 @@ contains
     use controlMod            , only : NLFilename
     use clm_instMod           , only : clm_fates
     use BalanceCheckMod       , only : BalanceCheckInit
+    use SoilHydrologyMod      , only : PrescribedRunoffInit
     !
     ! !ARGUMENTS    
     !
@@ -503,7 +504,7 @@ contains
     if(use_soil_moisture_streams) then 
        call PrescribedSoilMoistureInit(bounds_proc)
     endif
-    !call PrescribedRunoffInit(bounds_proc, glc_behavior)
+    call PrescribedRunoffInit(bounds_proc, glc_behavior)
 
     
 
